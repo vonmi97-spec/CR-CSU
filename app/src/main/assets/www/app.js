@@ -22,7 +22,7 @@ function idb(store, mode, fn) {
   });
 }
 const putMedia = (id, blob) => idb('media', 'readwrite', s => s.put(blob, id));
-const getMedia = id => idb('media', 'readonly', s => s.get(id));
+const getMedia = async id => { if (typeof pending !== 'undefined' && pending[id]) await pending[id]; return idb('media', 'readonly', s => s.get(id)); };
 const delMedia = id => idb('media', 'readwrite', s => s.delete(id));
 const allMediaKeys = () => idb('media', 'readonly', s => s.getAllKeys());
 
@@ -300,7 +300,7 @@ VIEWS.about = () => {
 };
 
 /* ---------- Médias ---------- */
-const urlCache = {};
+const urlCache = {}; const pending = {};
 async function mediaURL(id) { if (urlCache[id]) return urlCache[id]; const b = await getMedia(id); if (!b) return ''; return (urlCache[id] = URL.createObjectURL(b)); }
 function hydrateMedia() { document.querySelectorAll('[data-media]').forEach(async el => { el.src = await mediaURL(el.dataset.media); }); }
 const blobToDataURL = b => new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(b); });
@@ -308,6 +308,16 @@ async function dataURLToBlob(u) { return (await fetch(u)).blob(); }
 function compressImage(file) {
   const max = { basse: 800, moyenne: 1400, haute: 2400 }[S.settings.imageQuality] || 1400;
   const q = { basse: .6, moyenne: .75, haute: .9 }[S.settings.imageQuality] || .75;
+  if (window.createImageBitmap) return (async () => {
+    try {
+      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(bmp, 0, 0, w, h); bmp.close && bmp.close();
+      return await new Promise(ok => cv.toBlob(b => ok(b || file), 'image/jpeg', q));
+    } catch { return file; }
+  })();
   return new Promise(ok => {
     const img = new Image(); const u = URL.createObjectURL(file);
     img.onload = () => {
@@ -347,9 +357,10 @@ const curReport = () => { const c = cur(); return c.v === 'report' ? S.reports.f
 async function newEvent(fields) {
   const r = curReport(); if (!r) return;
   const e = Object.assign({ id: uid(), ts: Date.now(), type: 'text' }, fields);
-  if (S.settings.autoGeo && e.lat == null) await attachGeo(e, true);
   if (S.settings.validation === 'auto') { r.events.push(e); save(); render(); toast('Évènement ajouté'); }
   else { if (draft && draft.mediaId) delMedia(draft.mediaId); draft = e; render(); }
+  if (S.settings.autoGeo && e.lat == null) attachGeo(e, true).then(ok => { if (ok) { save(); if (cur().v === 'report') render(); } });
+  return e;
 }
 function commitDraft() {
   const r = curReport(); if (!r || !draft) return;
@@ -360,8 +371,14 @@ async function handleFile(file) {
   if (!file) return;
   const isVid = file.type.startsWith('video'); const isImg = file.type.startsWith('image');
   if (!isVid && !isImg) return toast('Format non pris en charge');
-  const blob = isImg ? await compressImage(file) : file;
-  const id = uid(); await putMedia(id, blob);
+  const id = uid();
+  urlCache[id] = URL.createObjectURL(file);            // affichage immédiat
+  pending[id] = (async () => {
+    const blob = isImg ? await compressImage(file) : file;
+    await putMedia(id, blob);
+    if (isImg) { const old = urlCache[id]; urlCache[id] = URL.createObjectURL(blob); setTimeout(() => URL.revokeObjectURL(old), 5000); }
+    delete pending[id];
+  })();
   newEvent({ type: isVid ? 'video' : 'photo', mediaId: id });
 }
 
