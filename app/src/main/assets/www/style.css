@@ -41,7 +41,7 @@ html,body{margin:0;height:100%;background:#2a2c2e;font-family:-apple-system,"Hel
 .ev .cat{font-weight:700}
 .ev .meta{font-size:12px;color:#6f737a;margin-top:2px}
 .ev .com{font-size:13px;color:#444;font-style:italic;margin-top:2px}
-.ev img.th,.ev video.th{width:64px;height:64px;object-fit:cover;border-radius:6px;background:#ddd}
+.ev img.th,.ev video.th{width:44px;height:44px;object-fit:cover;border-radius:6px;background:#ddd}
 .ev audio{width:100%;height:34px;margin-top:4px}
 .ev.pending{background:#fff8dc}
 .panel{flex:0 0 auto;background:linear-gradient(#e9eaec,#d7d9dc);padding:8px 8px calc(8px);border-top:1px solid #c5c8cc}
@@ -61,7 +61,7 @@ html,body{margin:0;height:100%;background:#2a2c2e;font-family:-apple-system,"Hel
 .draft textarea{width:100%;border:1px solid #ccc;border-radius:6px;padding:6px;font:inherit;margin-top:6px}
 /* détail évènement */
 .detail{padding:14px}
-.detail img,.detail video{max-width:100%;border-radius:8px;display:block;margin:0 auto 12px}
+.detail img,.detail video{max-width:100%;max-height:45vh;border-radius:8px;display:block;margin:0 auto 12px}
 .detail audio{width:100%;margin-bottom:12px}
 .field{background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:10px}
 .field label{display:block;font-size:12px;color:#777;margin-bottom:4px}

@@ -306,8 +306,8 @@ function hydrateMedia() { document.querySelectorAll('[data-media]').forEach(asyn
 const blobToDataURL = b => new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(b); });
 async function dataURLToBlob(u) { return (await fetch(u)).blob(); }
 function compressImage(file) {
-  const max = { basse: 800, moyenne: 1400, haute: 2400 }[S.settings.imageQuality] || 1400;
-  const q = { basse: .6, moyenne: .75, haute: .9 }[S.settings.imageQuality] || .75;
+  const max = { basse: 640, moyenne: 1024, haute: 1600 }[S.settings.imageQuality] || 1024;
+  const q = { basse: .55, moyenne: .68, haute: .82 }[S.settings.imageQuality] || .68;
   if (window.createImageBitmap) return (async () => {
     try {
       const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
