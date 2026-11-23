@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2a2c2e">
+<title>CR CSU</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="bar">
+    <div class="bar-left" id="barLeft"></div>
+    <div class="bar-title" id="barTitle">CR</div>
+    <div class="bar-right" id="barRight"></div>
+  </header>
+  <main id="view"></main>
+  <nav id="tabs">
+    <button data-tab="cr" class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 6.5V12l3.5 2.5"/></svg><span>Comptes-rendus</span></button>
+    <button data-tab="export" class="tab"><svg viewBox="0 0 24 24"><path d="M4 19c2-6 6-9 12-9V6l5 5.5-5 5.5v-4c-5 0-9 1.5-12 5.5z" class="fill"/></svg><span>Exporter</span></button>
+    <button data-tab="settings" class="tab"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19" stroke-width="3.2"/></svg><span>Paramètres</span></button>
+    <button data-tab="about" class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 10.5v7M12 7v.5" stroke-width="2.4"/></svg><span>À propos</span></button>
+  </nav>
+</div>
+<div id="modalRoot"></div>
+<input type="file" id="fileGallery" accept="image/*,video/*" hidden>
+<input type="file" id="filePhoto" accept="image/*" capture="environment" hidden>
+<input type="file" id="fileVideo" accept="video/*" capture="environment" hidden>
+<input type="file" id="fileRestore" accept=".json,application/json,*/*" hidden>
+<script src="app.js"></script>
+</body>
+</html>
