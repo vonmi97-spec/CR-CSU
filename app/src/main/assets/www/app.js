@@ -139,7 +139,7 @@ VIEWS.reports = c => {
 };
 
 let draft = null; // évènement en attente de validation
-function evHTML(e, pending) {
+function evHTML(e, pending, edit) {
   const st = S.settings; const bits = [];
   if (e.category) bits.push(`<span class="cat">${esc(e.category)}</span>`);
   if (e.text) bits.push(`<span>${esc(e.text)}</span>`);
@@ -154,7 +154,7 @@ function evHTML(e, pending) {
   if (e.lat != null && st.showCoords) meta.push(`${e.lat.toFixed(5)}, ${e.lon.toFixed(5)}`);
   if (e.address && st.showAddress) meta.push(esc(e.address));
   return `<div class="ev ${pending ? 'pending' : ''}" ${pending ? '' : `data-a="openEvent" data-id="${e.id}"`}>
-    <div class="time">${fTime(e.ts)}</div>
+    ${edit ? `<button class="del" data-a="quickDelEvent" data-id="${e.id}">Suppr.</button>` : ''}<div class="time">${fTime(e.ts)}</div>
     <div class="body">${bits.join(' — ') || (e.type === 'audio' ? '<span class="cat">Mémo vocal</span>' : e.type === 'photo' ? '<span class="cat">Photo</span>' : e.type === 'video' ? '<span class="cat">Vidéo</span>' : '')}
       ${audio}${meta.length ? `<div class="meta">📍 ${meta.join(' · ')}</div>` : ''}
       ${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}</div>${media}</div>`;
@@ -163,11 +163,17 @@ function evHTML(e, pending) {
 VIEWS.report = c => {
   const r = S.reports.find(x => x.id === c.id);
   if (!r) { stacks[tab].pop(); return VIEWS[cur().v](cur()); }
-  setBar(r.name, backBtn(), `<button class="bbtn" data-a="shareReport">${ICON.share}</button><button class="bbtn" data-a="editReport">Modifier</button>`);
+  const edit = c.edit;
+  setBar(r.name, backBtn(), edit ? `<button class="bbtn" data-a="toggleEdit">OK</button>` : `<button class="bbtn" data-a="shareReport">${ICON.share}</button><button class="bbtn" data-a="toggleEdit">Modifier</button>`);
   const evs = sortedEvents(r); let last = '';
-  const list = evs.map(e => { const k = dayKey(e.ts); const h = k !== last ? `<div class="group" style="padding:8px 14px 4px;font-size:13px">${k}</div>` : ''; last = k; return h + evHTML(e); }).join('');
+  const list = evs.map(e => { const k = dayKey(e.ts); const h = k !== last ? `<div class="group" style="padding:8px 14px 4px;font-size:13px">${k}</div>` : ''; last = k; return h + evHTML(e, false, edit); }).join('');
   const btns = S.buttons.slice(0, 9).map(b => { const [, a] = b.split('|'); return `<button class="qbtn" data-a="quick" data-b="${esc(b)}">${esc(a)}</button>`; }).join('');
   c.after = () => { const el = $('.events'); if (el && S.settings.sortEvents !== 'date_desc') el.scrollTop = el.scrollHeight; };
+  if (edit) return `<div class="report"><div class="events" style="background:#fff">
+      <div class="cell" data-a="editReport"><div class="grow"><div class="t" style="font-weight:600">Nom, section et profil</div><div class="s">${esc(r.name)} · ${esc(sectionName(r.sectionId))} · ${esc(r.profile)}</div></div><span class="chev">›</span></div>
+      <div class="hint">Touchez « Suppr. » pour effacer une note. Touchez une note pour la corriger.</div>
+      ${list || '<div class="empty">Aucun évènement.</div>'}
+      <div style="padding:16px"><button class="bigbtn red" data-a="delThisReport">Supprimer ce compte-rendu</button></div></div></div>`;
   return `<div class="report">
     <div class="events">${list || '<div class="empty">Aucun évènement.<br>Utilisez les boutons ci-dessous.</div>'}</div>
     <div class="panel">
@@ -539,6 +545,15 @@ const A = {
   async text() { const v = await ask('Nouvel évènement', [{ label: 'Texte', type: 'textarea' }]); if (v && v[0].trim()) newEvent({ type: 'text', text: v[0].trim() }); },
   validate() { commitDraft(); },
   cancelDraft() { if (draft && draft.mediaId) delMedia(draft.mediaId); draft = null; render(); },
+  async quickDelEvent(d) {
+    const r = curReport(); const e = r && r.events.find(x => x.id === d.id); if (!e) return;
+    if (!(await confirmBox('Supprimer cette note ?'))) return;
+    if (e.mediaId) delMedia(e.mediaId); r.events = r.events.filter(x => x !== e); save(); render(); toast('Note supprimée');
+  },
+  async delThisReport() {
+    const r = curReport(); if (!(await confirmBox('Supprimer ce compte-rendu et toutes ses notes ?'))) return;
+    r.events.forEach(e => e.mediaId && delMedia(e.mediaId)); S.reports = S.reports.filter(x => x !== r); save(); back();
+  },
   openEvent(d) { go('event', { rid: curReport().id, id: d.id }); },
   saveEvent() {
     const c = cur(); const r = S.reports.find(x => x.id === c.rid); const e = r.events.find(x => x.id === c.id);
