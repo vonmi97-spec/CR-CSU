@@ -153,11 +153,12 @@ function evHTML(e, pending, edit) {
   const meta = [];
   if (e.lat != null && st.showCoords) meta.push(`${e.lat.toFixed(5)}, ${e.lon.toFixed(5)}`);
   if (e.address && st.showAddress) meta.push(esc(e.address));
-  return `<div class="ev ${pending ? 'pending' : ''}" ${pending ? '' : `data-a="openEvent" data-id="${e.id}"`}>
+  const sw = !pending && !edit;
+  return `${sw ? `<div class="swipe"><button class="swbg" data-a="swipeDel" data-id="${e.id}">Supprimer</button>` : ''}<div class="ev ${pending ? 'pending' : ''}" ${pending ? '' : `data-a="openEvent" data-id="${e.id}"`}>
     ${edit ? `<button class="del" data-a="quickDelEvent" data-id="${e.id}">Suppr.</button>` : ''}<div class="time">${fTime(e.ts)}</div>
     <div class="body">${bits.join(' — ') || (e.type === 'audio' ? '<span class="cat">Mémo vocal</span>' : e.type === 'photo' ? '<span class="cat">Photo</span>' : e.type === 'video' ? '<span class="cat">Vidéo</span>' : '')}
       ${audio}${meta.length ? `<div class="meta">📍 ${meta.join(' · ')}</div>` : ''}
-      ${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}</div>${media}</div>`;
+      ${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}</div>${media}</div>${sw ? '</div>' : ''}`;
 }
 
 VIEWS.report = c => {
@@ -562,6 +563,11 @@ const A = {
   async text() { const v = await ask('Nouvel évènement', [{ label: 'Texte', type: 'textarea' }]); if (v && v[0].trim()) newEvent({ type: 'text', text: v[0].trim() }); },
   validate() { commitDraft(); },
   cancelDraft() { if (draft && draft.mediaId) delMedia(draft.mediaId); draft = null; render(); },
+  swipeDel(d) {
+    const r = curReport(); const i = r && r.events.findIndex(x => x.id === d.id); if (i < 0) return;
+    const e = r.events.splice(i, 1)[0]; save(); render();
+    undoToast('Note supprimée', () => { r.events.splice(i, 0, e); save(); if (cur().v === 'report') render(); }, () => { if (e.mediaId) delMedia(e.mediaId); });
+  },
   async quickDelEvent(d) {
     const r = curReport(); const e = r && r.events.find(x => x.id === d.id); if (!e) return;
     if (!(await confirmBox('Supprimer cette note ?'))) return;
@@ -627,9 +633,47 @@ const A = {
   delReminder(d) { if (NATIVE) Android.cancelReminder(d.id); S.reminders = S.reminders.filter(r => r.id !== d.id); save(); render(); }
 };
 
+function undoToast(msg, undo, commit) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div'); t.className = 'toast';
+  t.innerHTML = `${esc(msg)} <button style="margin-left:10px;background:none;border:0;color:#6fb1ff;font-weight:700;font-size:14px">ANNULER</button>`;
+  document.body.appendChild(t); let done = false;
+  const end = () => { if (done) return; done = true; t.remove(); commit && commit(); };
+  t.querySelector('button').onclick = () => { if (done) return; done = true; t.remove(); undo(); };
+  setTimeout(end, 4500);
+}
+
+/* ---------- Glisser pour supprimer ---------- */
+const SW = 96; let sw = null, swipedAt = 0;
+function closeSwipes(except) { document.querySelectorAll('.swipe .ev.open').forEach(el => { if (el !== except) { el.classList.remove('open'); el.style.transform = ''; } }); }
+document.addEventListener('pointerdown', e => {
+  const ev = e.target.closest('.swipe .ev'); if (!ev) { if (!e.target.closest('.swbg')) closeSwipes(); return; }
+  sw = { el: ev, x: e.clientX, y: e.clientY, base: ev.classList.contains('open') ? -SW : 0, dx: 0, h: null };
+});
+document.addEventListener('pointermove', e => {
+  if (!sw) return;
+  const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+  if (sw.h === null) { if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; sw.h = Math.abs(dx) > Math.abs(dy); if (sw.h) closeSwipes(sw.el); }
+  if (!sw.h) return;
+  sw.dx = dx; const w = sw.el.parentNode.offsetWidth;
+  sw.el.style.transition = 'none';
+  sw.el.style.transform = `translateX(${Math.max(-w, Math.min(0, sw.base + dx))}px)`;
+});
+function swipeEnd() {
+  if (!sw) return; const s = sw; sw = null; if (!s.h) return;
+  swipedAt = Date.now(); s.el.style.transition = '';
+  const pos = s.base + s.dx, w = s.el.parentNode.offsetWidth;
+  if (pos < -w * 0.55) { s.el.style.transform = `translateX(${-w}px)`; const id = s.el.parentNode.querySelector('.swbg').dataset.id; setTimeout(() => A.swipeDel({ id }), 180); }
+  else if (pos < -SW / 2) { s.el.classList.add('open'); s.el.style.transform = `translateX(${-SW}px)`; }
+  else { s.el.classList.remove('open'); s.el.style.transform = ''; }
+}
+document.addEventListener('pointerup', swipeEnd);
+document.addEventListener('pointercancel', swipeEnd);
+
 /* ---------- Événements globaux ---------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-a]'); if (!t || t.closest('#modalRoot')) return;
+  if (t.classList.contains('ev')) { if (Date.now() - swipedAt < 400) return; if (t.classList.contains('open')) { closeSwipes(); return; } }
   const fn = A[t.dataset.a]; if (fn) { e.stopPropagation(); fn(Object.assign({}, t.dataset)); }
 });
 document.addEventListener('input', e => { if (e.target.id === 'draftCom' && draft) draft.comment = e.target.value; });
