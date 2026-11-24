@@ -39,7 +39,7 @@ const DEFAULT = () => ({
   reminders: [],
   settings: {
     defaultName: 'CSU', validation: 'auto', sortReports: 'date', sortEvents: 'date', useEndDate: false,
-    timeFormat: 'sans', imageQuality: 'moyenne', videoQuality: 'moyenne', autoGeo: false, lang: 'fr',
+    timeFormat: 'sans', maxButtons: '9', btnCols: '3', imageQuality: 'moyenne', videoQuality: 'moyenne', autoGeo: false, lang: 'fr',
     email: '', multiExport: 'date', showDates: 'debut', showCoords: true, showCoordDate: false,
     showAddress: true, showComment: true, protectedExport: false, pin: ''
   },
@@ -112,6 +112,7 @@ function render() {
 
 /* ---------- Vues ---------- */
 const VIEWS = {};
+const maxBtn = () => +(S.settings.maxButtons || 9);
 /* ---------- Thème clair / sombre ---------- */
 const mqDark = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
 function applyTheme() {
@@ -177,7 +178,7 @@ VIEWS.report = c => {
   setBar(r.name, backBtn(), edit ? `<button class="bbtn" data-a="toggleEdit">OK</button>` : `<button class="bbtn" data-a="shareReport">${ICON.share}</button><button class="bbtn" data-a="toggleEdit">Modifier</button>`);
   const evs = sortedEvents(r); let last = '';
   const list = evs.map(e => { const k = dayKey(e.ts); const h = k !== last ? `<div class="group" style="padding:8px 14px 4px;font-size:13px">${k}</div>` : ''; last = k; return h + evHTML(e, false, edit); }).join('');
-  const btns = S.buttons.slice(0, 9).map(b => { const [, a] = b.split('|'); return `<button class="qbtn" data-a="quick" data-b="${esc(b)}">${esc(a)}</button>`; }).join('');
+  const btns = S.buttons.slice(0, maxBtn()).map(b => { const [, a] = b.split('|'); return `<button class="qbtn" data-a="quick" data-b="${esc(b)}">${esc(a)}</button>`; }).join('');
   c.after = () => { const el = $('.events'); if (el && S.settings.sortEvents !== 'date_desc') el.scrollTop = el.scrollHeight; };
   if (edit) return `<div class="report"><div class="events" style="background:#fff">
       <div class="cell" data-a="editReport"><div class="grow"><div class="t" style="font-weight:600">Nom, section et profil</div><div class="s">${esc(r.name)} · ${esc(sectionName(r.sectionId))} · ${esc(r.profile)}</div></div><span class="chev">›</span></div>
@@ -188,7 +189,7 @@ VIEWS.report = c => {
     <div class="events">${list || '<div class="empty">Aucun évènement.<br>Utilisez les boutons ci-dessous.</div>'}</div>
     <div class="panel">
       ${draft ? `<div class="draft">${evHTML(draft, true)}<textarea id="draftCom" placeholder="Commentaire (facultatif)">${esc(draft.comment || '')}</textarea></div>` : ''}
-      <div class="qbtns">${btns || '<button class="qbtn none" data-a="gotoButtons">Configurer les boutons (Paramètres › Boutons)</button>'}</div>
+      <div class="qbtns c${S.settings.btnCols || 3}">${btns || '<button class="qbtn none" data-a="gotoButtons">Configurer les boutons (Paramètres › Boutons)</button>'}</div>
       <div class="tools">
         <button class="tool" data-a="gallery">${ICON.gallery}</button>
         <button class="tool" data-a="camera">${ICON.camera}</button>
@@ -241,6 +242,8 @@ const CHOICES = {
   imageQuality: { label: 'Qualité des images', opts: [['basse', 'Basse'], ['moyenne', 'Moyenne'], ['haute', 'Haute']] },
   videoQuality: { label: 'Qualité des vidéos', opts: [['basse', 'Basse'], ['moyenne', 'Moyenne'], ['haute', 'Haute']] },
   multiExport: { label: 'Multi-Export', opts: [['date', 'Par date'], ['cr', 'Par compte-rendu']] },
+  maxButtons: { label: 'Nombre de boutons', opts: [['6', '6'], ['9', '9'], ['12', '12'], ['15', '15'], ['18', '18'], ['24', '24'], ['30', '30']] },
+  btnCols: { label: 'Boutons par ligne', opts: [['2', '2'], ['3', '3'], ['4', '4']] },
   showDates: { label: 'Afficher dates', opts: [['debut', 'Début'], ['debut_fin', 'Début et fin'], ['non', 'Non']] }
 };
 const BOOLS = { useEndDate: 'Utiliser une date de fin', autoGeo: 'Géolocalisation automatique', showCoords: 'Afficher coordonnées', showCoordDate: 'Afficher date coordonnées', showAddress: 'Afficher adresse', showComment: 'Afficher commentaire', protectedExport: 'Export protégé' };
@@ -259,7 +262,7 @@ VIEWS.settings = () => {
     ${navCell('Profil', '', 'editProfile', esc(S.profile.name))}
     ${navCell('Sections', 'Rangez vos comptes-rendus dans des sections logiques', 'gotoSections')}
     ${navCell('Catégories', 'Créez vos catégories et leurs actions pour la prise de note', 'gotoCategories')}
-    ${navCell('Boutons (max 9)', 'Personnalisez vos boutons à partir des catégories', 'gotoButtons')}
+    ${navCell(`Boutons (max ${maxBtn()})`, 'Personnalisez vos boutons à partir des catégories', 'gotoButtons')}
     ${navCell('Rappels', 'Définissez des rappels à une date précise ou après un délai', 'gotoReminders')}
     <div class="group">Paramètres</div>
     <div class="cell" data-a="defaultName"><div class="grow">Nom par défaut</div><span class="val">${esc(st.defaultName)}</span></div>
@@ -298,8 +301,8 @@ VIEWS.category = c => {
     `<div style="padding:16px"><button class="bigbtn red" data-a="delCategory">Supprimer la catégorie</button></div>`;
 };
 VIEWS.buttons = () => {
-  setBar('Boutons (max 9)', backBtn());
-  return `<div class="hint">${S.buttons.length}/9 boutons sélectionnés. Ils apparaissent en bas de chaque compte-rendu.</div>` +
+  setBar(`Boutons (max ${maxBtn()})`, backBtn());
+  return `${choiceCell('maxButtons')}${choiceCell('btnCols')}<div class="hint">${S.buttons.length}/${maxBtn()} boutons sélectionnés. Ils apparaissent en bas de chaque compte-rendu.</div>` +
     S.categories.map(k => `<div class="group">${esc(k.name)}</div>` + k.actions.map(a => { const key = k.id + '|' + a; const on = S.buttons.includes(key); return `<div class="cell" data-a="toggleButton" data-b="${esc(key)}"><span class="ck ${on ? 'on' : ''}">${on ? '✓' : ''}</span><div class="grow">${esc(a)}</div></div>`; }).join('')).join('');
 };
 VIEWS.reminders = () => {
@@ -718,7 +721,7 @@ const A = {
   async addAction() { const k = S.categories.find(x => x.id === cur().id); const v = await ask('Nouvelle action', [{ label: 'Nom de l\'action' }]); if (v && v[0].trim()) { k.actions.push(v[0].trim()); save(); render(); } },
   async renameAction(d) { const k = S.categories.find(x => x.id === cur().id); const old = k.actions[d.i]; const v = await ask('Renommer l\'action', [{ label: 'Nom', value: old }]); if (v && v[0].trim()) { k.actions[d.i] = v[0].trim(); S.buttons = S.buttons.map(b => b === k.id + '|' + old ? k.id + '|' + v[0].trim() : b); save(); render(); } },
   delAction(d) { const k = S.categories.find(x => x.id === cur().id); const a = k.actions.splice(d.i, 1)[0]; S.buttons = S.buttons.filter(b => b !== k.id + '|' + a); save(); render(); },
-  toggleButton(d) { const i = S.buttons.indexOf(d.b); if (i >= 0) S.buttons.splice(i, 1); else if (S.buttons.length >= 9) return toast('Maximum 9 boutons'); else S.buttons.push(d.b); save(); render(); },
+  toggleButton(d) { const i = S.buttons.indexOf(d.b); if (i >= 0) S.buttons.splice(i, 1); else if (S.buttons.length >= maxBtn()) return toast(`Maximum ${maxBtn()} boutons (modifiable en haut de cette page)`); else S.buttons.push(d.b); save(); render(); },
   async addReminder() {
     const v = await ask('Nouveau rappel', [{ label: 'Libellé', value: 'Rédiger le compte-rendu' }, { label: 'Type', type: 'select', value: 'delay', options: [['delay', 'Après un délai'], ['date', 'À une date précise']] }, { label: 'Délai en minutes (si « après un délai »)', type: 'number', value: '60' }, { label: 'Date et heure (si « date précise »)', type: 'datetime-local', value: toLocalInput(Date.now() + 3600e3) }]);
     if (!v) return;

@@ -142,3 +142,8 @@ html.dark .cgrp{color:#8fa2ff}
 html.dark .sw{background:#48484a}
 html.dark .ck{border-color:#636366}
 html.dark .toast{background:#3a3a3ce8}
+
+/* grille des boutons rapides : 2/3/4 par ligne, défilement au-delà de 4 lignes */
+.qbtns{max-height:178px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.qbtns.c2{grid-template-columns:repeat(2,1fr)}.qbtns.c3{grid-template-columns:repeat(3,1fr)}
+.qbtns.c4{grid-template-columns:repeat(4,1fr)}.qbtns.c4 .qbtn{font-size:12px;padding:9px 2px}
