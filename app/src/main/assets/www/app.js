@@ -210,7 +210,7 @@ VIEWS.event = c => {
   let media = '';
   if (e.mediaId) media = e.type === 'photo' ? `<img data-media="${e.mediaId}">` : e.type === 'video' ? `<video controls data-media="${e.mediaId}"></video>` : `<audio controls data-media="${e.mediaId}"></audio>`;
   return `<div class="detail">${media}
-    <div class="field"><label>Date et heure</label><input type="datetime-local" id="eTs" value="${toLocalInput(e.ts)}" step="1"></div>
+    <div class="field dtp"><label>Date et heure</label><input type="hidden" id="eTs" value="${e.ts}">${dtPickerHTML(e.ts)}</div>
     <div class="field"><label>Action / catégorie</label><input type="hidden" id="eCat" value="${esc(e.category || '')}">
       <div class="cpick"><button type="button" class="chip none ${!e.category ? 'on' : ''}" data-a="pickCat" data-v="">Aucune</button></div>
       ${S.categories.filter(k => k.actions.length).map(k => `<div class="cgrp">${esc(k.name)}</div><div class="cpick">${k.actions.map(a => `<button type="button" class="chip ${a === e.category ? 'on' : ''}" data-a="pickCat" data-v="${esc(a)}">${esc(a)}</button>`).join('')}</div>`).join('')}
@@ -222,6 +222,50 @@ VIEWS.event = c => {
     <button class="bigbtn grey" data-a="addGeoToEvent">${e.lat != null ? 'Mettre à jour la position' : 'Ajouter ma position'}</button>
     <button class="bigbtn red" data-a="delEvent">Supprimer l'évènement</button></div>`;
 };
+
+/* Sélecteur date/heure intégré : flèches jour, boutons − / +, saisie directe, raccourcis. */
+const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+function dayLabel(ts) {
+  const d = new Date(ts), t = new Date(); t.setHours(0, 0, 0, 0);
+  const diff = Math.round((new Date(d).setHours(0, 0, 0, 0) - t) / 864e5);
+  const rel = diff === 0 ? "Aujourd'hui" : diff === -1 ? 'Hier' : diff === 1 ? 'Demain' : '';
+  const full = `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
+  return rel ? `<b>${rel}</b><span>${full}</span>` : `<b>${full.charAt(0).toUpperCase() + full.slice(1)}</b>`;
+}
+function dtPickerHTML(ts) {
+  const d = new Date(ts), p2 = n => String(n).padStart(2, '0');
+  return `<div class="dt-day"><button type="button" class="dt-arr" data-a="dtShift" data-d="-1" aria-label="Jour précédent">‹</button><div class="dt-dlab" data-a="dtCal">${dayLabel(ts)}</div><button type="button" class="dt-arr" data-a="dtShift" data-d="1" aria-label="Jour suivant">›</button></div>
+    <div class="dt-time">
+      <div class="dt-col"><button type="button" class="dt-pm" data-a="dtShift" data-m="60">▲</button><input id="dtH" class="dt-num" inputmode="numeric" maxlength="2" value="${p2(d.getHours())}"><button type="button" class="dt-pm" data-a="dtShift" data-m="-60">▼</button><small>heures</small></div>
+      <div class="dt-sep">:</div>
+      <div class="dt-col"><button type="button" class="dt-pm" data-a="dtShift" data-m="1">▲</button><input id="dtM" class="dt-num" inputmode="numeric" maxlength="2" value="${p2(d.getMinutes())}"><button type="button" class="dt-pm" data-a="dtShift" data-m="-1">▼</button><small>minutes</small></div>
+    </div>
+    <div class="dt-quick"><button type="button" class="chip" data-a="dtNow">🕒 Maintenant</button><button type="button" class="chip" data-a="dtShift" data-m="-5">−5 min</button><button type="button" class="chip" data-a="dtShift" data-m="5">+5 min</button><button type="button" class="chip" data-a="dtShift" data-m="-15">−15 min</button><button type="button" class="chip" data-a="dtShift" data-m="15">+15 min</button></div>
+    <input type="date" id="dtCal" class="dt-hidden" value="${toLocalInput(ts).slice(0, 10)}">`;
+}
+function dtSet(ts) {
+  const box = document.querySelector('.dtp'); if (!box) return;
+  $('#eTs').value = ts;
+  const d = new Date(ts), p2 = n => String(n).padStart(2, '0');
+  box.querySelector('.dt-dlab').innerHTML = dayLabel(ts);
+  if (document.activeElement !== $('#dtH')) $('#dtH').value = p2(d.getHours());
+  if (document.activeElement !== $('#dtM')) $('#dtM').value = p2(d.getMinutes());
+  $('#dtCal').value = toLocalInput(ts).slice(0, 10);
+  box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
+}
+document.addEventListener('input', ev => {
+  const id = ev.target.id; if (!['dtH', 'dtM', 'dtCal'].includes(id)) return;
+  const d = new Date(+$('#eTs').value);
+  if (id === 'dtCal') { if (!ev.target.value) return; const [y, m, j] = ev.target.value.split('-').map(Number); d.setFullYear(y, m - 1, j); return dtSet(d.getTime()); }
+  const v = ev.target.value.replace(/\D/g, '').slice(0, 2); ev.target.value = v; if (v === '') return;
+  const n = Math.min(+v, id === 'dtH' ? 23 : 59);
+  if (id === 'dtH') d.setHours(n); else d.setMinutes(n);
+  $('#eTs').value = d.getTime(); document.querySelector('.dt-dlab').innerHTML = dayLabel(d.getTime());
+  if (v.length === 2 && id === 'dtH') $('#dtM').focus();
+});
+document.addEventListener('focusout', ev => { if (ev.target.id === 'dtH' || ev.target.id === 'dtM') { ev.target.value = String(ev.target.value || 0).padStart(2, '0'); } });
+document.addEventListener('focusin', ev => { if (ev.target.id === 'dtH' || ev.target.id === 'dtM') setTimeout(() => ev.target.select(), 0); });
 
 /* --- Exporter (multi-export) --- */
 VIEWS.export = c => {
@@ -688,6 +732,13 @@ const A = {
   toggleSecure() { S.settings.secureScreen = !S.settings.secureScreen; save(); applySecure(); render(); toast(S.settings.secureScreen ? 'Écran confidentiel activé' : 'Écran confidentiel désactivé'); },
   setTheme(d) { S.settings.theme = d.v; save(); applyTheme(); render(); },
   toggleTheme() { S.settings.theme = document.documentElement.classList.contains('dark') ? 'clair' : 'sombre'; save(); applyTheme(); render(); },
+  dtShift(d) {
+    const t = new Date(+$('#eTs').value);
+    if (d.d) t.setDate(t.getDate() + +d.d); else t.setMinutes(t.getMinutes() + +d.m);
+    dtSet(t.getTime()); if (navigator.vibrate) navigator.vibrate(6);
+  },
+  dtNow() { const t = new Date(); t.setSeconds(0, 0); dtSet(t.getTime()); },
+  dtCal() { const el = $('#dtCal'); if (el.showPicker) try { el.showPicker(); return; } catch {} el.focus(); el.click(); },
   pickCat(d, el) {
     const v = el ? el.dataset.v : d.v; $('#eCat').value = v;
     document.querySelectorAll('.chip[data-a="pickCat"]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
@@ -695,7 +746,7 @@ const A = {
   },
   saveEvent() {
     const c = cur(); const r = S.reports.find(x => x.id === c.rid); const e = r.events.find(x => x.id === c.id);
-    const ts = $('#eTs').value; if (ts) e.ts = new Date(ts).getTime();
+    const ts = +$('#eTs').value; if (ts) e.ts = ts;
     e.category = $('#eCat').value; e.text = $('#eText').value.trim(); e.comment = $('#eCom').value.trim();
     const ph = $('#ePhone'); if (ph) e.phone = ph.value.trim();
     save(); back();

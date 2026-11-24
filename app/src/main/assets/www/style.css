@@ -190,3 +190,30 @@ html.dark .tool svg{fill:none}
 .tab.on[data-tab="export"]{color:#34c759}
 .tab.on[data-tab="settings"]{color:#ff9f0a}
 .tab.on[data-tab="about"]{color:#bf8bff}
+
+/* sélecteur date / heure intégré */
+.dt-day{display:flex;align-items:center;gap:8px;margin:4px 0 10px}
+.dt-arr{width:44px;height:44px;flex:none;border-radius:50%;border:0;background:#eef2ff;color:#2f7cf6;font-size:28px;line-height:1;padding-bottom:4px}
+.dt-arr:active{background:#d6e0ff}
+.dt-dlab{flex:1;text-align:center;padding:6px 4px;border-radius:10px}
+.dt-dlab:active{background:#0000000d}
+.dt-dlab b{display:block;font-size:17px}
+.dt-dlab span{display:block;font-size:13px;color:#777;margin-top:1px}
+.dt-time{display:flex;align-items:center;justify-content:center;gap:10px}
+.dt-col{display:flex;flex-direction:column;align-items:center;gap:6px}
+.dt-col small{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.4px}
+.dt-pm{width:84px;height:38px;border:0;border-radius:10px;background:#eef2ff;color:#2f7cf6;font-size:15px}
+.dt-pm:active{background:#d6e0ff;transform:scale(.96)}
+.field .dt-num{width:84px;height:64px;text-align:center;font-size:38px;font-weight:700;border-radius:12px;background:#f4f6fa;border:2px solid transparent;font-variant-numeric:tabular-nums;color:#111;padding:0}
+.field .dt-num:focus{border-color:#2f7cf6;background:#fff}
+.dt-sep{font-size:38px;font-weight:700;color:#999;padding-bottom:22px}
+.dt-quick{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.dt-quick .chip{padding:7px 12px;font-size:14px}
+.field .dt-hidden{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.dtp{position:relative}
+.dtp.flash .dt-num,.dtp.flash .dt-dlab b{animation:dtflash .35s}
+@keyframes dtflash{from{color:#2f7cf6}to{}}
+html.dark .dt-arr,html.dark .dt-pm{background:#2c2c2e;color:#5ea0ff}
+html.dark .field .dt-num{background:#2c2c2e;color:#f2f2f7}
+html.dark .field .dt-num:focus{background:#000;border-color:#2f7cf6}
+html.dark .dt-dlab span,html.dark .dt-col small{color:#98989f}
