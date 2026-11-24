@@ -166,3 +166,27 @@ html.dark .toast{background:#3a3a3ce8}
 .lk-k.fn{background:transparent;font-size:24px}
 .lk-k.empty{visibility:hidden}
 .lk-cancel{background:none;border:0;color:#9fb4ff;font-size:16px;padding:10px}
+
+/* ===== Icônes en couleur ===== */
+.tools .tool{border:0;color:#fff;box-shadow:0 2px 5px #0003,inset 0 1px 0 #ffffff40}
+.tools .tool svg{width:27px;height:27px;fill:none;stroke:#fff}
+.tools .tool:active{filter:brightness(.88);transform:scale(.96)}
+.tool[data-a="gallery"]{background:linear-gradient(#a77bff,#7b4fe8)}
+.tool[data-a="camera"]{background:linear-gradient(#4da3ff,#1f6ae0)}
+.tool[data-a="geo"]{background:linear-gradient(#4cd964,#23a447)}
+.tool[data-a="mic"]{background:linear-gradient(#ff7a6b,#e5484d)}
+.tool[data-a="text"]{background:linear-gradient(#ffc043,#f08c00)}
+html.dark .tools .tool{border:0;box-shadow:0 2px 6px #0008}
+html.dark .tool[data-a="gallery"]{background:linear-gradient(#a77bff,#7b4fe8)}
+html.dark .tool[data-a="camera"]{background:linear-gradient(#4da3ff,#1f6ae0)}
+html.dark .tool[data-a="geo"]{background:linear-gradient(#4cd964,#23a447)}
+html.dark .tool[data-a="mic"]{background:linear-gradient(#ff7a6b,#e5484d)}
+html.dark .tool[data-a="text"]{background:linear-gradient(#ffc043,#f08c00)}
+html.dark .tool svg{fill:none}
+/* onglets : chaque onglet a sa couleur */
+.tab svg{stroke-width:2}
+.tab[data-tab="settings"] svg{fill:none;stroke:currentColor}
+.tab.on[data-tab="cr"]{color:#4da3ff}
+.tab.on[data-tab="export"]{color:#34c759}
+.tab.on[data-tab="settings"]{color:#ff9f0a}
+.tab.on[data-tab="about"]{color:#bf8bff}

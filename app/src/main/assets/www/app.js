@@ -95,10 +95,10 @@ function toast(m) { const t = document.createElement('div'); t.className = 'toas
 const ICON = {
   back: '<svg viewBox="0 0 24 24"><path d="M15 4l-8 8 8 8"/></svg>',
   share: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M6 11H4.5v10h15V11H18"/></svg>',
-  gallery: '<svg viewBox="0 0 24 24"><path d="M3 5h15v12H3z" fill="none" stroke="#333" stroke-width="2"/><path d="M6 20h15V8" fill="none" stroke="#333" stroke-width="2"/><path d="M5 15l4-4 3 3 2-2 3 3z"/></svg>',
-  camera: '<svg viewBox="0 0 24 24"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4.2" fill="#ddd"/><circle cx="12" cy="13" r="2.6"/></svg>',
-  pin: '<svg viewBox="0 0 24 24"><path d="M12 2a6.5 6.5 0 0 0-6.5 6.5C5.5 13.5 12 22 12 22s6.5-8.5 6.5-13.5A6.5 6.5 0 0 0 12 2z"/><circle cx="12" cy="8.5" r="2.5" fill="#ddd"/></svg>',
-  mic: '<svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0" fill="none" stroke="#333" stroke-width="2"/><path d="M11 17h2v4h-2z"/></svg>'
+  gallery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9.5" r="1.8"/><path d="M21 16l-5-5-8 9"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.8"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5s-7-7.2-7-12.5a7 7 0 0 1 14 0c0 5.3-7 12.5-7 12.5z"/><circle cx="12" cy="9" r="2.6"/></svg>',
+  mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v4M8.5 21.5h7"/></svg>'
 };
 function setBar(title, left = '', right = '') { $('#barTitle').textContent = title; $('#barLeft').innerHTML = left; $('#barRight').innerHTML = right; }
 const backBtn = (label = 'Retour') => `<button class="bbtn" data-a="back">${ICON.back}${esc(label)}</button>`;
@@ -196,7 +196,7 @@ VIEWS.report = c => {
         <button class="tool" data-a="camera">${ICON.camera}</button>
         <button class="tool" data-a="geo">${ICON.pin}</button>
         <button class="tool" data-a="mic">${ICON.mic}</button>
-        <button class="tool" data-a="text">Texte</button>
+        <button class="tool" data-a="text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2M12 5v14M9 19h6"/></svg></button>
       </div>
       <div class="actions"><button class="ok" data-a="validate" ${draft ? '' : 'disabled'}>Valider l'évènement</button><button class="ko" data-a="cancelDraft" ${draft ? '' : 'disabled'}>Annuler</button></div>
     </div></div>`;
