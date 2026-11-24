@@ -89,3 +89,13 @@ html,body{margin:0;height:100%;background:#2a2c2e;font-family:-apple-system,"Hel
 .swipe{position:relative;overflow:hidden;background:#e5484d}
 .swbg{position:absolute;right:0;top:0;bottom:0;width:96px;border:0;background:#e5484d;color:#fff;font-weight:700;font-size:14px}
 .swipe .ev{position:relative;transition:transform .2s ease;touch-action:pan-y;user-select:none}
+
+/* sélecteur de catégorie en pastilles */
+.cgrp{font-size:11px;font-weight:700;color:#3c4a8c;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 6px}
+.cpick{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid #d3d7de;background:#f6f7f9;color:#222;border-radius:18px;padding:8px 14px;font-size:15px;font-weight:500;line-height:1.1;transition:background .12s,border-color .12s,transform .08s}
+.chip:active{transform:scale(.95)}
+.chip.on{background:#2f7cf6;border-color:#2f7cf6;color:#fff;font-weight:600;box-shadow:0 2px 6px #2f7cf655}
+.chip.on::before{content:"✓ "}
+.chip.none{color:#777;font-style:italic}
+.chip.none.on{color:#fff;font-style:normal}

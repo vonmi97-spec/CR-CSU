@@ -200,7 +200,10 @@ VIEWS.event = c => {
   if (e.mediaId) media = e.type === 'photo' ? `<img data-media="${e.mediaId}">` : e.type === 'video' ? `<video controls data-media="${e.mediaId}"></video>` : `<audio controls data-media="${e.mediaId}"></audio>`;
   return `<div class="detail">${media}
     <div class="field"><label>Date et heure</label><input type="datetime-local" id="eTs" value="${toLocalInput(e.ts)}" step="1"></div>
-    <div class="field"><label>Action / catégorie</label><select id="eCat">${cats.map(a => `<option ${a === e.category ? 'selected' : ''}>${esc(a)}</option>`).join('')}${e.category && !cats.includes(e.category) ? `<option selected>${esc(e.category)}</option>` : ''}</select></div>
+    <div class="field"><label>Action / catégorie</label><input type="hidden" id="eCat" value="${esc(e.category || '')}">
+      <div class="cpick"><button type="button" class="chip none ${!e.category ? 'on' : ''}" data-a="pickCat" data-v="">Aucune</button></div>
+      ${S.categories.filter(k => k.actions.length).map(k => `<div class="cgrp">${esc(k.name)}</div><div class="cpick">${k.actions.map(a => `<button type="button" class="chip ${a === e.category ? 'on' : ''}" data-a="pickCat" data-v="${esc(a)}">${esc(a)}</button>`).join('')}</div>`).join('')}
+      ${e.category && !cats.includes(e.category) ? `<div class="cpick"><button type="button" class="chip on" data-a="pickCat" data-v="${esc(e.category)}">${esc(e.category)}</button></div>` : ''}</div>
     ${e.type === 'photo' ? `<div class="field"><label>Numéro lu sur la photo</label><input id="ePhone" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.phone === undefined ? 'Analyse en cours…' : 'Aucun numéro détecté'}"></div><button class="bigbtn grey" data-a="rescanPhone">Relire le numéro sur la photo</button>` : ''}
     <div class="field"><label>Texte</label><textarea id="eText">${esc(e.text || '')}</textarea></div>
     <div class="field"><label>Commentaire</label><textarea id="eCom">${esc(e.comment || '')}</textarea></div>
@@ -644,6 +647,11 @@ const A = {
     r.events.forEach(e => e.mediaId && delMedia(e.mediaId)); S.reports = S.reports.filter(x => x !== r); save(); back();
   },
   openEvent(d) { go('event', { rid: curReport().id, id: d.id }); },
+  pickCat(d, el) {
+    const v = el ? el.dataset.v : d.v; $('#eCat').value = v;
+    document.querySelectorAll('.chip[data-a="pickCat"]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    if (navigator.vibrate) navigator.vibrate(8);
+  },
   saveEvent() {
     const c = cur(); const r = S.reports.find(x => x.id === c.rid); const e = r.events.find(x => x.id === c.id);
     const ts = $('#eTs').value; if (ts) e.ts = new Date(ts).getTime();
