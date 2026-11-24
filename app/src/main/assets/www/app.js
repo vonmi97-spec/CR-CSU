@@ -470,20 +470,45 @@ async function buildHTML(reports, withImages) {
   let body = '';
   const evRow = async ({ r, e }) => {
     let img = '';
-    if (withImages && e.type === 'photo' && e.mediaId) { const b = await getMedia(e.mediaId); if (b) img = `<br><img src="${await blobToDataURL(b)}" style="max-width:320px;max-height:260px;margin-top:4px">`; }
+    if (withImages && e.type === 'photo' && e.mediaId) { const b = await getMedia(e.mediaId); if (b) img = `<div class="ph"><img src="${await blobToDataURL(b)}"></div>`; }
     const meta = [];
     if (e.lat != null && st.showCoords) meta.push(`GPS : ${e.lat.toFixed(5)}, ${e.lon.toFixed(5)}` + (st.showCoordDate && e.geoTs ? ` (${fDate(e.geoTs)} ${fTime(e.geoTs)})` : ''));
     if (e.address && st.showAddress) meta.push(esc(e.address));
-    return `<tr><td style="white-space:nowrap;vertical-align:top;padding:4px 8px;border-bottom:1px solid #ddd"><b>${fTime(e.ts)}</b></td><td style="padding:4px 8px;border-bottom:1px solid #ddd">${multi && st.multiExport === 'date' ? `<span style="color:#777">[${esc(r.name)}]</span> ` : ''}<b>${esc(e.category || '')}</b>${e.category && e.text ? ' — ' : ''}${esc(e.text || '')}${!e.category && !e.text ? esc(evLine(e)) : ''}${meta.length ? `<br><small style="color:#555">${meta.join(' · ')}</small>` : ''}${e.comment && st.showComment ? `<br><i>${esc(e.comment)}</i>` : ''}${img}</td></tr>`;
+    const tag = multi && st.multiExport === 'date' ? `<span class="tag">${esc(r.name)}</span>` : '';
+    const main = `${e.category ? `<b class="cat">${esc(e.category)}</b>` : ''}${e.category && e.text ? ' — ' : ''}${esc(e.text || '')}${!e.category && !e.text ? esc(evLine(e)) : ''}`;
+    return `<div class="ev"><div class="t">${fTime(e.ts)}</div><div class="c">${tag}<div class="txt">${main}</div>${meta.length ? `<div class="meta">${meta.join(' · ')}</div>` : ''}${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}${img}</div></div>`;
   };
-  const table = async rows => { let h = '', last = ''; for (const x of rows) { const k = fDate(x.e.ts); if (k !== last) { h += `<tr><td colspan="2" style="background:#eef;padding:6px 8px;font-weight:bold">${k}</td></tr>`; last = k; } h += await evRow(x); } return `<table style="width:100%;border-collapse:collapse;font-size:12pt">${h}</table>`; };
+  const table = async rows => { let h = '', last = ''; for (const x of rows) { const k = fDate(x.e.ts); if (k !== last) { h += `<div class="day">${k}</div>`; last = k; } h += await evRow(x); } return `<div class="list">${h || '<p class="empty">Aucun évènement.</p>'}</div>`; };
+  const info = (label, val) => `<div class="i"><span>${label}</span><b>${val}</b></div>`;
+  const per = () => { const h = headerText(reports); if (!h) return ''; return h.startsWith('Début : ') ? info('Début', esc(h.slice(8))) : info('Période', esc(h)); };
   if (multi && st.multiExport === 'cr') {
-    for (const r of reports) body += `<h2>${esc(r.name)}</h2><p>Section : ${esc(sectionName(r.sectionId))} — Profil : ${esc(r.profile)}<br>${reportSpan(r)} : ${plural(r.events.length, 'évènement')}</p>` + await table(rowsFor([r]));
+    body = `<header><h1>Comptes-rendus</h1><div class="sub">${esc(headerText(reports))}</div></header>`;
+    for (const r of reports) body += `<section><h2>${esc(r.name)}</h2><div class="info">${info('Section', esc(sectionName(r.sectionId)))}${info('Profil', esc(r.profile))}${info('Période', esc(reportSpan(r)))}${info('Évènements', r.events.length)}</div>${await table(rowsFor([r]))}</section>`;
   } else {
-    const r0 = reports[0];
-    body = `<h1>${multi ? 'Comptes-rendus' : esc(r0.name)}</h1><p>${multi ? reports.map(r => esc(r.name) + ' (' + reportSpan(r) + ')').join('<br>') : `Section : ${esc(sectionName(r0.sectionId))}<br>Profil : ${esc(r0.profile)}`}<br>${esc(headerText(reports))}</p>` + await table(rowsFor(reports));
+    const r0 = reports[0]; const n = rowsFor(reports).length;
+    body = `<header><h1>${multi ? 'Comptes-rendus' : esc(r0.name)}</h1></header><div class="info">${multi ? reports.map(r => info(esc(r.name), esc(reportSpan(r)))).join('') : info('Section', esc(sectionName(r0.sectionId))) + info('Profil', esc(r0.profile))}${per()}${info('Évènements', n)}</div>` + await table(rowsFor(reports));
   }
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Compte-rendu</title><style>body{font-family:Arial,sans-serif;color:#111;margin:24px}h1{font-size:20pt}h2{font-size:16pt;margin-top:28px}</style></head><body>${body}<p style="color:#888;font-size:9pt;margin-top:30px">Édité le ${fDate(Date.now())} à ${fTime(Date.now())} — ${esc(S.profile.name)}</p></body></html>`;
+  const css = `@page{size:A4;margin:12mm 14mm 16mm}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:10.5pt;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+header{border-bottom:3px solid #2b3a8c;padding-bottom:6px;margin-bottom:10px}
+h1{font-size:20pt;margin:0;color:#2b3a8c;letter-spacing:.5px}
+h2{font-size:14pt;margin:18px 0 8px;color:#2b3a8c;border-bottom:1px solid #c9cfee;padding-bottom:3px}
+section{break-before:auto}section+section{break-before:page}
+.sub{color:#555;font-size:9.5pt;margin-top:2px}
+.info{display:flex;flex-wrap:wrap;gap:6px 0;background:#f4f5fb;border:1px solid #dde0f2;border-radius:6px;padding:8px 10px;margin-bottom:14px}
+.i{width:50%;padding-right:10px}.i span{display:block;color:#6a6f86;font-size:8pt;text-transform:uppercase;letter-spacing:.4px}.i b{font-size:10.5pt}
+.day{background:#2b3a8c;color:#fff;font-weight:bold;padding:5px 10px;border-radius:4px;margin:12px 0 4px;break-after:avoid}
+.ev{display:flex;border-bottom:1px solid #e3e3e3;padding:8px 0;break-inside:avoid}
+.t{width:54px;flex:none;font-weight:bold;color:#2b3a8c;padding-left:4px}
+.c{flex:1;min-width:0}.txt{word-wrap:break-word}.cat{color:#000}
+.tag{display:inline-block;font-size:8pt;color:#555;background:#eee;border-radius:3px;padding:0 5px;margin-bottom:2px}
+.meta{color:#555;font-size:9pt;margin-top:2px}.com{font-style:italic;color:#333;margin-top:2px}
+.ph{margin-top:6px}.ph img{display:block;max-width:60%;max-height:80mm;width:auto;height:auto;border:1px solid #ccc;border-radius:4px;object-fit:contain}
+.empty{color:#888;font-style:italic}
+.foot{position:fixed;left:0;right:0;bottom:0;height:7mm;padding-top:4px;border-top:1px solid #ddd;color:#888;font-size:8.5pt;display:flex;justify-content:space-between;background:#fff}
+.wrap{width:100%;border-collapse:collapse}.wrap>tbody>tr>td{padding:0;vertical-align:top}.sp{height:9mm;padding:0}`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Compte-rendu</title><style>${css}</style></head><body><table class="wrap"><tbody><tr><td>${body}</td></tr></tbody><tfoot><tr><td class="sp"></td></tr></tfoot></table><div class="foot"><span>Édité le ${fDate(Date.now())} à ${fTime(Date.now())} — ${esc(S.profile.name)}</span><span>CR CSU</span></div></body></html>`;
 }
 function textBody(reports) {
   return rowsFor(reports).map(({ r, e }) => `${fDate(e.ts)} ${fTime(e.ts)}${reports.length > 1 ? ' [' + r.name + ']' : ''} : ${evLine(e)}${e.comment && S.settings.showComment ? ' (' + e.comment + ')' : ''}${e.address && S.settings.showAddress ? ' — ' + e.address : ''}`).join('\n');
