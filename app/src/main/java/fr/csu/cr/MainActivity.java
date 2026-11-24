@@ -2,6 +2,15 @@ package fr.csu.cr;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.Dialog;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.ClipData;
@@ -241,6 +250,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void previewPdf(String html, String jobName) {
+            runOnUiThread(() -> showPreview(html, jobName));
+        }
+
+        @JavascriptInterface
         public void printPdf(String html, String jobName) {
             runOnUiThread(() -> {
                 WebView pv = new WebView(MainActivity.this);
@@ -273,6 +287,67 @@ public class MainActivity extends Activity {
     }
 
     private TextRecognizer recognizer;
+
+    private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+
+    private Button barBtn(String txt, int bg) {
+        Button b = new Button(this);
+        b.setText(txt); b.setAllCaps(false); b.setTextColor(Color.WHITE); b.setTextSize(15);
+        GradientDrawable d = new GradientDrawable(); d.setColor(bg); d.setCornerRadius(dp(10));
+        b.setBackground(d); b.setMinWidth(0); b.setMinimumWidth(0); b.setMinHeight(0); b.setMinimumHeight(0);
+        b.setPadding(dp(12), dp(8), dp(12), dp(8));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(dp(4), 0, dp(4), 0); b.setLayoutParams(lp);
+        return b;
+    }
+
+    /** Aperçu du PDF dans l'appli, avec zoom (pincer ou boutons − / +), avant enregistrement. */
+    private void showPreview(String html, String jobName) {
+        Dialog dlg = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.parseColor("#2a2c2e"));
+
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(8), dp(10), dp(8), dp(10));
+
+        Button close = barBtn("✕", Color.parseColor("#48484a"));
+        TextView title = new TextView(this);
+        title.setText("Aperçu"); title.setTextColor(Color.WHITE); title.setTextSize(17);
+        title.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        title.setPadding(dp(8), 0, 0, 0);
+        Button minus = barBtn("−", Color.parseColor("#48484a"));
+        Button plus = barBtn("+", Color.parseColor("#48484a"));
+        Button save = barBtn("Enregistrer PDF", Color.parseColor("#2f7cf6"));
+        bar.addView(close); bar.addView(title); bar.addView(minus); bar.addView(plus); bar.addView(save);
+
+        WebView pv = new WebView(this);
+        WebSettings ws = pv.getSettings();
+        ws.setSupportZoom(true);
+        ws.setBuiltInZoomControls(true);
+        ws.setDisplayZoomControls(false);
+        ws.setUseWideViewPort(true);
+        ws.setLoadWithOverviewMode(true);
+        pv.setBackgroundColor(Color.parseColor("#8a8f96"));
+        pv.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        pv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+
+        root.addView(bar); root.addView(pv);
+        dlg.setContentView(root);
+
+        close.setOnClickListener(v -> dlg.dismiss());
+        minus.setOnClickListener(v -> pv.zoomOut());
+        plus.setOnClickListener(v -> pv.zoomIn());
+        save.setOnClickListener(v -> {
+            PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+            pm.print(jobName, pv.createPrintDocumentAdapter(jobName),
+                    new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build());
+        });
+        dlg.setOnDismissListener(d -> pv.destroy());
+        dlg.show();
+    }
 
     private void ocrResult(String id, String text) {
         final String js = "window.__ocr && window.__ocr(" + JSONObject.quote(id) + "," + JSONObject.quote(text == null ? "" : text) + ")";

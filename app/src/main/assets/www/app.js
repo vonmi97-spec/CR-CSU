@@ -112,6 +112,15 @@ function render() {
 
 /* ---------- Vues ---------- */
 const VIEWS = {};
+/* ---------- Thème clair / sombre ---------- */
+const mqDark = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+function applyTheme() {
+  const t = (S && S.settings.theme) || 'clair';
+  const dark = t === 'sombre' || (t === 'auto' && mqDark && mqDark.matches);
+  document.documentElement.classList.toggle('dark', dark);
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = dark ? '#000000' : '#2a2c2e';
+}
+if (mqDark && mqDark.addEventListener) mqDark.addEventListener('change', applyTheme);
 
 VIEWS.sections = () => {
   setBar('Sections', '', '');
@@ -243,7 +252,10 @@ const navCell = (t, s, a, v = '') => `<div class="cell" data-a="${a}"><div class
 VIEWS.settings = () => {
   setBar('Paramètres');
   const st = S.settings;
-  return `<div class="group">Personnalisation</div>
+  const th = st.theme || 'clair';
+  return `<div class="group">Apparence</div>
+    <div class="seg">${[['clair', '☀️ Clair'], ['sombre', '🌙 Sombre'], ['auto', '🌓 Auto']].map(([v, l]) => `<button class="${th === v ? 'on' : ''}" data-a="setTheme" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="group">Personnalisation</div>
     ${navCell('Profil', '', 'editProfile', esc(S.profile.name))}
     ${navCell('Sections', 'Rangez vos comptes-rendus dans des sections logiques', 'gotoSections')}
     ${navCell('Catégories', 'Créez vos catégories et leurs actions pour la prise de note', 'gotoCategories')}
@@ -525,6 +537,7 @@ async function buildHTML(reports, withImages) {
     body = `<header><h1>${multi ? 'Comptes-rendus' : esc(r0.name)}</h1></header><div class="info">${multi ? reports.map(r => info(esc(r.name), esc(reportSpan(r)))).join('') : info('Section', esc(sectionName(r0.sectionId))) + info('Profil', esc(r0.profile))}${per()}${info('Évènements', n)}</div>` + await table(rowsFor(reports));
   }
   const css = `@page{size:A4;margin:12mm 14mm 16mm}
+@media screen{html{background:#8a8f96}body{width:794px;margin:16px auto;background:#fff;padding:45px 53px;box-shadow:0 2px 12px #0006}.foot{position:static;margin-top:14px}.sp{height:0}}
 *{box-sizing:border-box}html,body{margin:0;padding:0}
 body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:10.5pt;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 header{border-bottom:3px solid #2b3a8c;padding-bottom:6px;margin-bottom:10px}
@@ -550,7 +563,7 @@ td.dt .d{font-weight:bold}td.dt .h{color:#2b3a8c;font-weight:bold;font-size:12pt
 .empty{color:#888;font-style:italic}
 .foot{position:fixed;left:0;right:0;bottom:0;height:7mm;padding-top:4px;border-top:1px solid #ddd;color:#888;font-size:8.5pt;display:flex;justify-content:space-between;background:#fff}
 .wrap{width:100%;border-collapse:collapse}.wrap>tbody>tr>td{padding:0;vertical-align:top}.sp{height:9mm;padding:0}`;
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Compte-rendu</title><style>${css}</style></head><body><table class="wrap"><tbody><tr><td>${body}</td></tr></tbody><tfoot><tr><td class="sp"></td></tr></tfoot></table><div class="foot"><span>Édité le ${fDate(Date.now())} à ${fTime(Date.now())} — ${esc(S.profile.name)}</span><span>CR CSU</span></div></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=820, user-scalable=yes"><title>Compte-rendu</title><style>${css}</style></head><body><table class="wrap"><tbody><tr><td>${body}</td></tr></tbody><tfoot><tr><td class="sp"></td></tr></tfoot></table><div class="foot"><span>Édité le ${fDate(Date.now())} à ${fTime(Date.now())} — ${esc(S.profile.name)}</span><span>CR CSU</span></div></body></html>`;
 }
 function textBody(reports) {
   return rowsFor(reports).map(({ r, e }) => `${fDate(e.ts)} ${fTime(e.ts)}${reports.length > 1 ? ' [' + r.name + ']' : ''} : ${evLine(e)}${e.comment && S.settings.showComment ? ' (' + e.comment + ')' : ''}${e.address && S.settings.showAddress ? ' — ' + e.address : ''}`).join('\n');
@@ -575,7 +588,7 @@ async function exportReports(reports) {
   const subj = reports.length > 1 ? `Comptes-rendus (${reports.length})` : `Compte-rendu ${reports[0].name} – ${reportSpan(reports[0])}`;
   if (fmt === 'csv') shareFile(base + '.csv', 'text/csv', b64(buildCSV(reports)), subj);
   else if (fmt === 'doc') shareFile(base + '.doc', 'application/msword', b64(await buildHTML(reports, true)), subj);
-  else if (fmt === 'pdf') { const h = await buildHTML(reports, true); if (NATIVE) Android.printPdf(h, base); else { const w = window.open(''); w.document.write(h); w.print(); } }
+  else if (fmt === 'pdf') { const h = await buildHTML(reports, true); if (NATIVE) { if (Android.previewPdf) Android.previewPdf(h, base); else Android.printPdf(h, base); } else { const w = window.open(''); w.document.write(h); w.print(); } }
   else if (fmt === 'mail') { if (NATIVE) Android.sendEmail(S.settings.email || '', subj, textBody(reports)); else location.href = `mailto:${S.settings.email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(textBody(reports))}`; }
 }
 
@@ -647,6 +660,8 @@ const A = {
     r.events.forEach(e => e.mediaId && delMedia(e.mediaId)); S.reports = S.reports.filter(x => x !== r); save(); back();
   },
   openEvent(d) { go('event', { rid: curReport().id, id: d.id }); },
+  setTheme(d) { S.settings.theme = d.v; save(); applyTheme(); render(); },
+  toggleTheme() { S.settings.theme = document.documentElement.classList.contains('dark') ? 'clair' : 'sombre'; save(); applyTheme(); render(); },
   pickCat(d, el) {
     const v = el ? el.dataset.v : d.v; $('#eCat').value = v;
     document.querySelectorAll('.chip[data-a="pickCat"]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
@@ -764,4 +779,4 @@ document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
 for (const id of ['fileGallery', 'filePhoto', 'fileVideo']) $('#' + id).onchange = e => handleFile(e.target.files[0]);
 $('#fileRestore').onchange = e => e.target.files[0] && restore(e.target.files[0]);
 
-(async () => { await load(); render(); })();
+(async () => { await load(); applyTheme(); render(); })();

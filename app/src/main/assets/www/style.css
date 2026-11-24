@@ -99,3 +99,46 @@ html,body{margin:0;height:100%;background:#2a2c2e;font-family:-apple-system,"Hel
 .chip.on::before{content:"✓ "}
 .chip.none{color:#777;font-style:italic}
 .chip.none.on{color:#fff;font-style:normal}
+
+/* bascule d'apparence */
+.seg{display:flex;gap:6px;background:#fff;padding:8px 12px 12px;border-bottom:1px solid #dfe2e6}
+.seg button{flex:1;border:1.5px solid #d3d7de;background:#f6f7f9;color:#222;border-radius:10px;padding:10px 4px;font-size:15px;font-weight:600}
+.seg button.on{background:#2f7cf6;border-color:#2f7cf6;color:#fff}
+
+/* ===== Mode sombre ===== */
+html.dark{color-scheme:dark}
+html.dark body,html.dark #bar,html.dark #tabs{background:#000}
+html.dark #bar{border-bottom:1px solid #1c1c1e}
+html.dark #tabs{border-top:1px solid #1c1c1e}
+html.dark #view,html.dark .group{background:#000;color:#f2f2f7}
+html.dark .group{color:#8fa2ff}
+html.dark .cell,html.dark .seg{background:#1c1c1e;border-color:#2c2c2e;color:#f2f2f7}
+html.dark .cell:active{background:#2c2c2e}
+html.dark .cell .s,html.dark .cell .val{color:#98989f}
+html.dark .cell .chev{color:#5a5a5f}
+html.dark .empty,html.dark .hint{color:#8e8e93}
+html.dark .events{background:repeating-linear-gradient(#1c1c1e 0 47px,#2c2c2e 47px 48px)}
+html.dark .ev{background:#1c1c1e;border-color:#2c2c2e;color:#f2f2f7}
+html.dark .ev .time{color:#5ea0ff}
+html.dark .ev .meta{color:#98989f}html.dark .ev .com{color:#c7c7cc}
+html.dark .ev.pending{background:#3a3320}
+html.dark .panel{background:linear-gradient(#1c1c1e,#111);border-color:#2c2c2e}
+html.dark .qbtn,html.dark .tool{background:linear-gradient(#3a3a3c,#2c2c2e);border-color:#48484a;color:#f2f2f7;box-shadow:none}
+html.dark .tool svg{fill:#f2f2f7}
+html.dark .qbtn:active,html.dark .tool:active{background:#48484a}
+html.dark .draft{background:#2c2c2e;color:#f2f2f7}
+html.dark .draft textarea{background:#1c1c1e;color:#f2f2f7;border-color:#48484a}
+html.dark .field{background:#1c1c1e}
+html.dark .field label{color:#98989f}
+html.dark .field input,html.dark .field textarea,html.dark .field select{color:#f2f2f7}
+html.dark .about{color:#e5e5ea}html.dark .about .logo{background:#2c2c2e}
+html.dark .sheet{background:#111}
+html.dark .sheet .opt{background:#1c1c1e;border-color:#2c2c2e;color:#5ea0ff}
+html.dark .sheet h3{color:#f2f2f7}
+html.dark .chip,html.dark .seg button{background:#2c2c2e;border-color:#48484a;color:#f2f2f7}
+html.dark .chip.on,html.dark .seg button.on{background:#2f7cf6;border-color:#2f7cf6;color:#fff}
+html.dark .chip.none{color:#98989f}html.dark .chip.none.on{color:#fff}
+html.dark .cgrp{color:#8fa2ff}
+html.dark .sw{background:#48484a}
+html.dark .ck{border-color:#636366}
+html.dark .toast{background:#3a3a3ce8}
