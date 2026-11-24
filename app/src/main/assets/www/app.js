@@ -41,7 +41,8 @@ const DEFAULT = () => ({
     defaultName: 'CSU', validation: 'auto', sortReports: 'date', sortEvents: 'date', useEndDate: false,
     timeFormat: 'sans', maxButtons: '9', btnCols: '3', imageQuality: 'moyenne', videoQuality: 'moyenne', autoGeo: false, lang: 'fr',
     email: '', multiExport: 'date', showDates: 'debut', showCoords: true, showCoordDate: false,
-    showAddress: true, showComment: true, protectedExport: false, pin: ''
+    showAddress: true, showComment: true, protectedExport: false, pin: '',
+    lockOn: false, lockHash: '', lockSalt: '', lockLen: 0, lockBio: false, lockDelay: '60', secureScreen: false
   },
   reports: []
 });
@@ -88,7 +89,7 @@ let tab = 'cr';
 const cur = () => stacks[tab][stacks[tab].length - 1];
 function go(v, args = {}) { stacks[tab].push(Object.assign({ v }, args)); render(); $('#view').scrollTop = 0; }
 function back() { if (stacks[tab].length > 1) { stacks[tab].pop(); render(); } }
-window.__back = () => { if ($('#modalRoot').innerHTML) { closeModal(); return true; } if (stacks[tab].length > 1) { back(); return true; } return false; };
+window.__back = () => { if (document.getElementById('lock')) return false; if ($('#modalRoot').innerHTML) { closeModal(); return true; } if (stacks[tab].length > 1) { back(); return true; } return false; };
 
 function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2300); }
 const ICON = {
@@ -244,6 +245,7 @@ const CHOICES = {
   multiExport: { label: 'Multi-Export', opts: [['date', 'Par date'], ['cr', 'Par compte-rendu']] },
   maxButtons: { label: 'Nombre de boutons', opts: [['6', '6'], ['9', '9'], ['12', '12'], ['15', '15'], ['18', '18'], ['24', '24'], ['30', '30']] },
   btnCols: { label: 'Boutons par ligne', opts: [['2', '2'], ['3', '3'], ['4', '4']] },
+  lockDelay: { label: 'Verrouiller après', opts: [['0', 'Immédiatement'], ['60', '1 minute'], ['300', '5 minutes'], ['900', '15 minutes']] },
   showDates: { label: 'Afficher dates', opts: [['debut', 'Début'], ['debut_fin', 'Début et fin'], ['non', 'Non']] }
 };
 const BOOLS = { useEndDate: 'Utiliser une date de fin', autoGeo: 'Géolocalisation automatique', showCoords: 'Afficher coordonnées', showCoordDate: 'Afficher date coordonnées', showAddress: 'Afficher adresse', showComment: 'Afficher commentaire', protectedExport: 'Export protégé' };
@@ -269,6 +271,14 @@ VIEWS.settings = () => {
     ${choiceCell('validation')}${choiceCell('sortReports')}${choiceCell('sortEvents')}${boolCell('useEndDate')}
     ${choiceCell('timeFormat')}${choiceCell('imageQuality')}${choiceCell('videoQuality')}${boolCell('autoGeo')}
     <div class="cell"><div class="grow">Langage</div><span class="val">Français 🇫🇷</span></div>
+    <div class="group">🔒 Protection des données</div>
+    <div class="cell" data-a="toggleLock"><div class="grow"><div>Verrouillage par code</div><div class="s">Code demandé à l'ouverture de l'appli</div></div><span class="sw ${st.lockOn ? 'on' : ''}"></span></div>
+    ${st.lockOn ? `<div class="cell" data-a="changeLock"><div class="grow">Changer le code</div><span class="chev">›</span></div>
+    ${choiceCell('lockDelay')}
+    ${NATIVE && Android.canBiometric && Android.canBiometric() ? `<div class="cell" data-a="toggleBio"><div class="grow"><div>Déverrouiller avec l'empreinte</div><div class="s">Le code reste utilisable</div></div><span class="sw ${st.lockBio ? 'on' : ''}"></span></div>` : ''}
+    <div class="cell" data-a="lockNow"><div class="grow">Verrouiller maintenant</div><span style="font-size:18px">🔒</span></div>` : ''}
+    <div class="cell" data-a="toggleSecure"><div class="grow"><div>Écran confidentiel</div><div class="s">Bloque les captures d'écran et masque l'appli dans les applis récentes</div></div><span class="sw ${st.secureScreen ? 'on' : ''}"></span></div>
+    <div class="cell" data-a="info" data-m="Vos comptes-rendus, photos et numéros restent uniquement sur ce téléphone, dans l'espace privé de l'appli : rien n'est envoyé sur internet et la sauvegarde automatique Android (cloud) est désactivée. Seuls les exports que vous partagez vous-même quittent l'appli."><div class="grow">Où sont stockées mes données ?</div><span class="chev">›</span></div>
     <div class="group">Sauvegarde</div>
     <div class="cell" data-a="backup"><span style="font-size:20px">☁️</span><div class="grow t" style="font-weight:600">Sauvegarder</div></div>
     <div class="cell" data-a="restore"><span style="font-size:20px">📥</span><div class="grow t" style="font-weight:600">Restaurer</div></div>
@@ -663,6 +673,19 @@ const A = {
     r.events.forEach(e => e.mediaId && delMedia(e.mediaId)); S.reports = S.reports.filter(x => x !== r); save(); back();
   },
   openEvent(d) { go('event', { rid: curReport().id, id: d.id }); },
+  async toggleLock() {
+    const st = S.settings;
+    if (!st.lockOn) { if (await newLockCode()) { st.lockOn = true; save(); render(); toast('Verrouillage activé 🔒'); } }
+    else if (await verifyLock('Désactiver le verrouillage')) { st.lockOn = false; st.lockHash = ''; st.lockBio = false; save(); render(); toast('Verrouillage désactivé'); }
+  },
+  async changeLock() { if (await verifyLock('Changer le code') && await newLockCode()) { save(); render(); toast('Code modifié'); } },
+  async toggleBio() {
+    const st = S.settings;
+    if (!st.lockBio) { bioCb = ok => { if (ok) { st.lockBio = true; save(); render(); toast('Empreinte activée'); } }; Android.biometric('Activer l\'empreinte'); }
+    else { st.lockBio = false; save(); render(); }
+  },
+  lockNow() { pausedAt = 0; lockApp(); },
+  toggleSecure() { S.settings.secureScreen = !S.settings.secureScreen; save(); applySecure(); render(); toast(S.settings.secureScreen ? 'Écran confidentiel activé' : 'Écran confidentiel désactivé'); },
   setTheme(d) { S.settings.theme = d.v; save(); applyTheme(); render(); },
   toggleTheme() { S.settings.theme = document.documentElement.classList.contains('dark') ? 'clair' : 'sombre'; save(); applyTheme(); render(); },
   pickCat(d, el) {
@@ -769,6 +792,77 @@ function swipeEnd() {
 document.addEventListener('pointerup', swipeEnd);
 document.addEventListener('pointercancel', swipeEnd);
 
+/* ---------- Verrouillage de l'appli ---------- */
+async function hashPin(pin, salt) {
+  const txt = salt + ':' + pin;
+  try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+  catch { let h = 5381; for (const c of txt) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0; return 'd' + h.toString(16); }
+}
+let bioCb = null;
+window.__bio = ok => { const f = bioCb; bioCb = null; if (f) f(ok); };
+const canBio = () => NATIVE && Android.canBiometric && Android.biometric && S.settings.lockBio && Android.canBiometric();
+/* Pavé numérique plein écran. mode 'unlock' : se valide seul ; mode 'set' : 4 à 6 chiffres + OK. */
+function pinPad({ title, sub = '', mode = 'unlock', check, cancel }) {
+  return new Promise(done => {
+    let code = '', fails = 0, waitUntil = 0;
+    const el = document.createElement('div'); el.id = 'lock'; el.className = 'lock';
+    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', mode === 'unlock' && canBio() ? 'bio' : (mode === 'set' ? 'ok' : ''), '0', 'del'];
+    el.innerHTML = `<div class="lk-top"><div class="lk-logo">🔒</div><div class="lk-t">${esc(title)}</div><div class="lk-s">${esc(sub)}</div><div class="lk-dots"></div><div class="lk-err"></div></div>
+      <div class="lk-pad">${keys.map(k => `<button class="lk-k ${k ? '' : 'empty'} ${['bio', 'ok', 'del'].includes(k) ? 'fn' : ''}" data-k="${k}">${k === 'bio' ? '👆' : k === 'ok' ? 'OK' : k === 'del' ? '⌫' : k}</button>`).join('')}</div>
+      ${cancel ? '<button class="lk-cancel">Annuler</button>' : ''}`;
+    document.body.appendChild(el);
+    const dots = el.querySelector('.lk-dots'), err = el.querySelector('.lk-err');
+    const n = mode === 'unlock' ? S.settings.lockLen : 6;
+    const draw = () => { dots.innerHTML = Array.from({ length: mode === 'unlock' ? n : Math.max(4, code.length) }, (_, i) => `<i class="${i < code.length ? 'on' : ''}"></i>`).join(''); };
+    const finish = v => { el.remove(); done(v); };
+    const shake = msg => { err.textContent = msg; dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake'); if (navigator.vibrate) navigator.vibrate(120); };
+    const submit = async () => {
+      if (mode === 'set') { if (code.length < 4) return shake('Au moins 4 chiffres'); return finish(code); }
+      if (await check(code)) return finish(code);
+      fails++; code = ''; draw();
+      if (fails % 5 === 0) { waitUntil = Date.now() + 30000; shake('Trop d\'essais : patientez 30 s'); }
+      else shake(`Code incorrect (${fails})`);
+    };
+    const bio = () => { if (!canBio()) return; bioCb = ok => { if (ok) finish('bio'); }; Android.biometric('Déverrouiller CR CSU'); };
+    el.querySelectorAll('.lk-k').forEach(b => b.onclick = () => {
+      const k = b.dataset.k; if (!k) return;
+      if (Date.now() < waitUntil) return shake(`Patientez ${Math.ceil((waitUntil - Date.now()) / 1000)} s`);
+      if (k === 'del') { code = code.slice(0, -1); err.textContent = ''; }
+      else if (k === 'bio') return bio();
+      else if (k === 'ok') return submit();
+      else if (code.length < n) { code += k; err.textContent = ''; }
+      draw();
+      if (mode === 'unlock' && code.length === n) setTimeout(submit, 120);
+    });
+    if (cancel) el.querySelector('.lk-cancel').onclick = () => finish(null);
+    draw();
+    if (mode === 'unlock' && canBio()) setTimeout(bio, 350);
+  });
+}
+let locking = false, pausedAt = 0;
+async function lockApp() {
+  if (!S.settings.lockOn || !S.settings.lockHash || locking || document.getElementById('lock')) return;
+  locking = true; closeModal();
+  await pinPad({ title: 'CR CSU verrouillé', sub: 'Saisissez votre code', check: async c => (await hashPin(c, S.settings.lockSalt)) === S.settings.lockHash });
+  locking = false;
+}
+window.__pause = () => { pausedAt = Date.now(); };
+window.__resume = skip => {
+  if (skip || !pausedAt) return;
+  if ((Date.now() - pausedAt) / 1000 >= +(S.settings.lockDelay || 0)) lockApp();
+};
+async function newLockCode() {
+  const a = await pinPad({ title: 'Nouveau code', sub: 'Choisissez 4 à 6 chiffres puis OK', mode: 'set', cancel: true }); if (!a) return false;
+  const b = await pinPad({ title: 'Confirmez le code', sub: 'Saisissez-le une seconde fois puis OK', mode: 'set', cancel: true }); if (!b) return false;
+  if (a !== b) { toast('Les deux codes sont différents'); return false; }
+  const st = S.settings; st.lockSalt = uid() + uid(); st.lockHash = await hashPin(a, st.lockSalt); st.lockLen = a.length; return true;
+}
+async function verifyLock(title) {
+  if (!S.settings.lockOn) return true;
+  return !!(await pinPad({ title, sub: 'Saisissez votre code actuel', cancel: true, check: async c => (await hashPin(c, S.settings.lockSalt)) === S.settings.lockHash }));
+}
+function applySecure() { if (NATIVE && Android.setSecure) Android.setSecure(!!S.settings.secureScreen); }
+
 /* ---------- Événements globaux ---------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-a]'); if (!t || t.closest('#modalRoot')) return;
@@ -782,4 +876,4 @@ document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
 for (const id of ['fileGallery', 'filePhoto', 'fileVideo']) $('#' + id).onchange = e => handleFile(e.target.files[0]);
 $('#fileRestore').onchange = e => e.target.files[0] && restore(e.target.files[0]);
 
-(async () => { await load(); applyTheme(); render(); })();
+(async () => { await load(); applyTheme(); applySecure(); lockApp(); render(); })();

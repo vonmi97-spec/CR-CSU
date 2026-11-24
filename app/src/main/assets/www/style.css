@@ -147,3 +147,22 @@ html.dark .toast{background:#3a3a3ce8}
 .qbtns{max-height:178px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .qbtns.c2{grid-template-columns:repeat(2,1fr)}.qbtns.c3{grid-template-columns:repeat(3,1fr)}
 .qbtns.c4{grid-template-columns:repeat(4,1fr)}.qbtns.c4 .qbtn{font-size:12px;padding:9px 2px}
+
+/* écran de verrouillage */
+.lock{position:fixed;inset:0;z-index:200;background:linear-gradient(160deg,#1d2a5c,#0d1126);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 50px) 24px calc(env(safe-area-inset-bottom) + 28px);user-select:none}
+.lk-top{text-align:center}
+.lk-logo{font-size:40px;margin-bottom:10px}
+.lk-t{font-size:21px;font-weight:700}
+.lk-s{font-size:14px;color:#b9c2e6;margin-top:6px;min-height:18px}
+.lk-dots{display:flex;gap:16px;justify-content:center;margin-top:28px;min-height:16px}
+.lk-dots i{width:15px;height:15px;border-radius:50%;border:2px solid #fff;display:block;transition:background .1s}
+.lk-dots i.on{background:#fff}
+.lk-dots.shake{animation:lkshake .35s}
+@keyframes lkshake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+.lk-err{color:#ff8a8a;font-size:14px;margin-top:14px;min-height:18px}
+.lk-pad{display:grid;grid-template-columns:repeat(3,78px);gap:18px 26px;justify-content:center}
+.lk-k{width:78px;height:78px;border-radius:50%;border:0;background:#ffffff1f;color:#fff;font-size:30px;font-weight:400}
+.lk-k:active{background:#ffffff55}
+.lk-k.fn{background:transparent;font-size:24px}
+.lk-k.empty{visibility:hidden}
+.lk-cancel{background:none;border:0;color:#9fb4ff;font-size:16px;padding:10px}

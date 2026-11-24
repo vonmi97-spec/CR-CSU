@@ -3,6 +3,9 @@ package fr.csu.cr;
 import android.Manifest;
 import android.app.Activity;
 import android.app.Dialog;
+import android.hardware.biometrics.BiometricManager;
+import android.hardware.biometrics.BiometricPrompt;
+import android.os.CancellationSignal;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
@@ -174,7 +177,7 @@ public class MainActivity extends Activity {
     private void ensurePerms(String... perms) {
         List<String> need = new ArrayList<>();
         for (String p : perms) if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED && !need.contains(p)) need.add(p);
-        if (!need.isEmpty()) runOnUiThread(() -> requestPermissions(need.toArray(new String[0]), REQ_PERM));
+        if (!need.isEmpty()) runOnUiThread(() -> { ext = true; requestPermissions(need.toArray(new String[0]), REQ_PERM); });
     }
 
     @Override
@@ -192,6 +195,29 @@ public class MainActivity extends Activity {
         }
         fileCb.onReceiveValue(out);
         fileCb = null;
+    }
+
+    /** Vrai quand l'appli ouvre elle-même une autre fenêtre (appareil photo, partage, impression…) :
+     *  au retour, on ne reverrouille pas. */
+    private boolean ext = false;
+
+    @Override
+    public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
+        ext = true;
+        super.startActivityForResult(intent, requestCode, options);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (web != null) web.evaluateJavascript("window.__pause && window.__pause()", null);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        final boolean skip = ext; ext = false;
+        if (web != null) web.evaluateJavascript("window.__resume && window.__resume(" + skip + ")", null);
     }
 
     @Override
@@ -250,6 +276,42 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void setSecure(boolean on) {
+            runOnUiThread(() -> {
+                if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+                else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            });
+        }
+
+        @JavascriptInterface
+        public boolean canBiometric() {
+            if (Build.VERSION.SDK_INT >= 29) {
+                BiometricManager bm = getSystemService(BiometricManager.class);
+                return bm != null && bm.canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS;
+            }
+            return Build.VERSION.SDK_INT >= 28 && getPackageManager().hasSystemFeature(PackageManager.FEATURE_FINGERPRINT);
+        }
+
+        @JavascriptInterface
+        public void biometric(String title) {
+            if (Build.VERSION.SDK_INT < 28) { bioResult(false); return; }
+            ext = true;
+            runOnUiThread(() -> {
+                try {
+                    BiometricPrompt bp = new BiometricPrompt.Builder(MainActivity.this)
+                            .setTitle(title)
+                            .setSubtitle("Touchez le capteur d'empreinte")
+                            .setNegativeButton("Utiliser le code", getMainExecutor(), (d, w) -> bioResult(false))
+                            .build();
+                    bp.authenticate(new CancellationSignal(), getMainExecutor(), new BiometricPrompt.AuthenticationCallback() {
+                        @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult r) { bioResult(true); }
+                        @Override public void onAuthenticationError(int code, CharSequence msg) { bioResult(false); }
+                    });
+                } catch (Exception e) { bioResult(false); }
+            });
+        }
+
+        @JavascriptInterface
         public void previewPdf(String html, String jobName) {
             runOnUiThread(() -> showPreview(html, jobName));
         }
@@ -262,7 +324,7 @@ public class MainActivity extends Activity {
                     @Override
                     public void onPageFinished(WebView v, String url) {
                         PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-                        pm.print(jobName, v.createPrintDocumentAdapter(jobName),
+                        ext = true; pm.print(jobName, v.createPrintDocumentAdapter(jobName),
                                 new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build());
                     }
                 });
@@ -287,6 +349,10 @@ public class MainActivity extends Activity {
     }
 
     private TextRecognizer recognizer;
+
+    private void bioResult(boolean ok) {
+        runOnUiThread(() -> web.evaluateJavascript("window.__bio && window.__bio(" + ok + ")", null));
+    }
 
     private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
@@ -342,7 +408,7 @@ public class MainActivity extends Activity {
         plus.setOnClickListener(v -> pv.zoomIn());
         save.setOnClickListener(v -> {
             PrintManager pm = (PrintManager) getSystemService(Context.PRINT_SERVICE);
-            pm.print(jobName, pv.createPrintDocumentAdapter(jobName),
+            ext = true; pm.print(jobName, pv.createPrintDocumentAdapter(jobName),
                     new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build());
         });
         dlg.setOnDismissListener(d -> pv.destroy());
