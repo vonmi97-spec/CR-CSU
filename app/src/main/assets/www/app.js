@@ -157,7 +157,7 @@ function evHTML(e, pending, edit) {
   return `${sw ? `<div class="swipe"><button class="swbg" data-a="swipeDel" data-id="${e.id}">Supprimer</button>` : ''}<div class="ev ${pending ? 'pending' : ''}" ${pending ? '' : `data-a="openEvent" data-id="${e.id}"`}>
     ${edit ? `<button class="del" data-a="quickDelEvent" data-id="${e.id}">Suppr.</button>` : ''}<div class="time">${fTime(e.ts)}</div>
     <div class="body">${bits.join(' — ') || (e.type === 'audio' ? '<span class="cat">Mémo vocal</span>' : e.type === 'photo' ? '<span class="cat">Photo</span>' : e.type === 'video' ? '<span class="cat">Vidéo</span>' : '')}
-      ${audio}${meta.length ? `<div class="meta">📍 ${meta.join(' · ')}</div>` : ''}
+      ${e.phone ? `<div class="meta">📞 ${esc(e.phone)}</div>` : ''}${audio}${meta.length ? `<div class="meta">📍 ${meta.join(' · ')}</div>` : ''}
       ${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}</div>${media}</div>${sw ? '</div>' : ''}`;
 }
 
@@ -201,6 +201,7 @@ VIEWS.event = c => {
   return `<div class="detail">${media}
     <div class="field"><label>Date et heure</label><input type="datetime-local" id="eTs" value="${toLocalInput(e.ts)}" step="1"></div>
     <div class="field"><label>Action / catégorie</label><select id="eCat">${cats.map(a => `<option ${a === e.category ? 'selected' : ''}>${esc(a)}</option>`).join('')}${e.category && !cats.includes(e.category) ? `<option selected>${esc(e.category)}</option>` : ''}</select></div>
+    ${e.type === 'photo' ? `<div class="field"><label>Numéro lu sur la photo</label><input id="ePhone" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.phone === undefined ? 'Analyse en cours…' : 'Aucun numéro détecté'}"></div><button class="bigbtn grey" data-a="rescanPhone">Relire le numéro sur la photo</button>` : ''}
     <div class="field"><label>Texte</label><textarea id="eText">${esc(e.text || '')}</textarea></div>
     <div class="field"><label>Commentaire</label><textarea id="eCom">${esc(e.comment || '')}</textarea></div>
     ${e.lat != null ? `<div class="field"><label>Coordonnées${e.geoTs ? ' (relevées le ' + fDate(e.geoTs) + ' à ' + fTime(e.geoTs) + ')' : ''}</label><div>${e.lat.toFixed(6)}, ${e.lon.toFixed(6)}</div>${e.address ? `<div style="font-size:14px;color:#555;margin-top:4px">${esc(e.address)}</div>` : ''}</div>` : ''}
@@ -353,6 +354,37 @@ async function attachGeo(e, silent) {
   } catch (err) { if (!silent) toast('Position indisponible (GPS activé ?)'); return false; }
 }
 
+/* ---------- Lecture du numéro sur les photos (OCR ML Kit, hors-ligne) ---------- */
+const ocrWait = {};
+window.__ocr = (id, text) => { const f = ocrWait[id]; if (f) { delete ocrWait[id]; f(text || ''); } };
+async function ocrBlob(blob) {
+  if (!NATIVE || !Android.ocr || !blob) return '';
+  const data = await blobToDataURL(blob); const id = uid();
+  return new Promise(res => { ocrWait[id] = res; setTimeout(() => window.__ocr(id, ''), 20000); Android.ocr(id, data.split(',')[1]); });
+}
+function fmtPhone(d) { return d.length === 10 ? d.replace(/(\d\d)(?=\d)/g, '$1 ') : d; }
+function extractPhones(text) {
+  const t = String(text).replace(/[Oo](?=\d)|(?<=\d)[Oo]/g, '0').replace(/(\d)[ .\-]+(?=\d)/g, '$1');
+  const out = [];
+  for (let d of t.match(/\+?\d{9,14}/g) || []) {
+    d = d.replace('+', '00');
+    if (/^0033\d{9}$/.test(d)) d = '0' + d.slice(4);
+    else if (/^33[1-9]\d{8}$/.test(d)) d = '0' + d.slice(2);
+    else if (/^00[1-9]\d{8}$/.test(d)) d = d.slice(1);          // 0 de sortie (ligne extérieure) + numéro
+    else if (/^[1-9]\d{8}$/.test(d)) d = '0' + d;
+    if (!/^0[1-9]\d{8}$/.test(d) && !/^00\d{9,12}$/.test(d)) continue;
+    const f = fmtPhone(d); if (!out.includes(f)) out.push(f);
+  }
+  return out.join(', ');
+}
+async function detectPhone(e) {
+  if (e.type !== 'photo' || !e.mediaId || e.phone !== undefined) return false;
+  if (pending[e.mediaId]) await pending[e.mediaId];
+  const txt = await ocrBlob(await getMedia(e.mediaId));
+  if (!NATIVE || !Android.ocr) return false;
+  e.phone = extractPhones(txt); return true;
+}
+
 /* ---------- Création d'évènements ---------- */
 const curReport = () => { const c = cur(); return c.v === 'report' ? S.reports.find(r => r.id === c.id) : null; };
 async function newEvent(fields) {
@@ -360,6 +392,7 @@ async function newEvent(fields) {
   const e = Object.assign({ id: uid(), ts: Date.now(), type: 'text' }, fields);
   if (S.settings.validation === 'auto') { r.events.push(e); save(); render(); toast('Évènement ajouté'); }
   else { if (draft && draft.mediaId) delMedia(draft.mediaId); draft = e; render(); }
+  if (e.type === 'photo') detectPhone(e).then(ok => { if (ok) { save(); if (['report', 'event'].includes(cur().v)) render(); if (e.phone) toast('Numéro détecté : ' + e.phone); } });
   if (S.settings.autoGeo && e.lat == null) attachGeo(e, true).then(ok => { if (ok) { save(); if (cur().v === 'report') render(); } });
   return e;
 }
@@ -453,12 +486,12 @@ function headerText(reports) {
 }
 function buildCSV(reports) {
   const st = S.settings; const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const head = ['Compte-rendu', 'Section', 'Profil', 'Date', 'Heure', 'Catégorie', 'Texte', 'Type'];
+  const head = ['Compte-rendu', 'Section', 'Profil', 'Date', 'Heure', 'Catégorie', 'Texte', 'Numéro', 'Type'];
   if (st.showCoords) head.push('Latitude', 'Longitude'); if (st.showCoordDate) head.push('Date coordonnées');
   if (st.showAddress) head.push('Adresse'); if (st.showComment) head.push('Commentaire');
   const lines = [head.map(q).join(';')];
   for (const { r, e } of rowsFor(reports)) {
-    const row = [r.name, sectionName(r.sectionId), r.profile, fDate(e.ts), fTime(e.ts), e.category, e.text, e.type];
+    const row = [r.name, sectionName(r.sectionId), r.profile, fDate(e.ts), fTime(e.ts), e.category, e.text, e.phone || '', e.type];
     if (st.showCoords) row.push(e.lat ?? '', e.lon ?? ''); if (st.showCoordDate) row.push(e.geoTs ? fDate(e.geoTs) + ' ' + fTime(e.geoTs) : '');
     if (st.showAddress) row.push(e.address); if (st.showComment) row.push(e.comment);
     lines.push(row.map(q).join(';'));
@@ -476,9 +509,9 @@ async function buildHTML(reports, withImages) {
     if (e.address && st.showAddress) meta.push(esc(e.address));
     const tag = multi && st.multiExport === 'date' ? `<span class="tag">${esc(r.name)}</span>` : '';
     const main = `${e.category ? `<b class="cat">${esc(e.category)}</b>` : ''}${e.category && e.text ? ' — ' : ''}${esc(e.text || '')}${!e.category && !e.text ? esc(evLine(e)) : ''}`;
-    return `<div class="ev"><div class="t">${fTime(e.ts)}</div><div class="c">${tag}<div class="txt">${main}</div>${meta.length ? `<div class="meta">${meta.join(' · ')}</div>` : ''}${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}${img}</div></div>`;
+    return `<tr><td class="dt"><div class="d">${fDate(e.ts)}</div><div class="h">${fTime(e.ts)}</div></td><td class="c">${tag}<div class="txt">${main}</div>${e.phone ? `<div class="tel">N° : <b>${esc(e.phone)}</b></div>` : ''}${meta.length ? `<div class="meta">${meta.join(' · ')}</div>` : ''}${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}${img}</td></tr>`;
   };
-  const table = async rows => { let h = '', last = ''; for (const x of rows) { const k = fDate(x.e.ts); if (k !== last) { h += `<div class="day">${k}</div>`; last = k; } h += await evRow(x); } return `<div class="list">${h || '<p class="empty">Aucun évènement.</p>'}</div>`; };
+  const table = async rows => { let h = ''; for (const x of rows) h += await evRow(x); return h ? `<table class="list"><thead><tr><th class="dt">Date et heure</th><th>Évènement</th></tr></thead><tbody>${h}</tbody></table>` : '<p class="empty">Aucun évènement.</p>'; };
   const info = (label, val) => `<div class="i"><span>${label}</span><b>${val}</b></div>`;
   const per = () => { const h = headerText(reports); if (!h) return ''; return h.startsWith('Début : ') ? info('Début', esc(h.slice(8))) : info('Période', esc(h)); };
   if (multi && st.multiExport === 'cr') {
@@ -498,13 +531,19 @@ section{break-before:auto}section+section{break-before:page}
 .sub{color:#555;font-size:9.5pt;margin-top:2px}
 .info{display:flex;flex-wrap:wrap;gap:6px 0;background:#f4f5fb;border:1px solid #dde0f2;border-radius:6px;padding:8px 10px;margin-bottom:14px}
 .i{width:50%;padding-right:10px}.i span{display:block;color:#6a6f86;font-size:8pt;text-transform:uppercase;letter-spacing:.4px}.i b{font-size:10.5pt}
-.day{background:#2b3a8c;color:#fff;font-weight:bold;padding:5px 10px;border-radius:4px;margin:12px 0 4px;break-after:avoid}
-.ev{display:flex;border-bottom:1px solid #e3e3e3;padding:8px 0;break-inside:avoid}
-.t{width:54px;flex:none;font-weight:bold;color:#2b3a8c;padding-left:4px}
-.c{flex:1;min-width:0}.txt{word-wrap:break-word}.cat{color:#000}
+table.list{width:100%;border-collapse:collapse;table-layout:fixed}
+.list thead{display:table-header-group}
+.list th{background:#2b3a8c;color:#fff;text-align:left;font-size:9.5pt;padding:6px 8px;border:1px solid #2b3a8c}
+.list td{border:1px solid #cfd3e6;padding:7px 8px;vertical-align:top}
+.list tr{break-inside:avoid}
+.list tbody tr:nth-child(even) td{background:#f8f9fd}
+th.dt,td.dt{width:30mm}
+td.dt .d{font-weight:bold}td.dt .h{color:#2b3a8c;font-weight:bold;font-size:12pt}
+.c{min-width:0}.txt{word-wrap:break-word}.cat{color:#000}
+.tel{margin-top:3px;font-size:11pt}.tel b{color:#2b3a8c;letter-spacing:.5px}
 .tag{display:inline-block;font-size:8pt;color:#555;background:#eee;border-radius:3px;padding:0 5px;margin-bottom:2px}
 .meta{color:#555;font-size:9pt;margin-top:2px}.com{font-style:italic;color:#333;margin-top:2px}
-.ph{margin-top:6px}.ph img{display:block;max-width:60%;max-height:80mm;width:auto;height:auto;border:1px solid #ccc;border-radius:4px;object-fit:contain}
+.ph{margin-top:6px}.ph img{display:block;max-width:70%;max-height:80mm;width:auto;height:auto;border:1px solid #ccc;border-radius:4px;object-fit:contain}
 .empty{color:#888;font-style:italic}
 .foot{position:fixed;left:0;right:0;bottom:0;height:7mm;padding-top:4px;border-top:1px solid #ddd;color:#888;font-size:8.5pt;display:flex;justify-content:space-between;background:#fff}
 .wrap{width:100%;border-collapse:collapse}.wrap>tbody>tr>td{padding:0;vertical-align:top}.sp{height:9mm;padding:0}`;
@@ -527,6 +566,8 @@ async function exportReports(reports) {
   if (!reports.length) return;
   const fmt = await sheet('Exporter', [['pdf', 'PDF'], ['csv', 'CSV (Excel)'], ['doc', 'DOC (Word)'], ['mail', 'Email (texte)']]);
   if (!fmt || !(await checkPin())) return;
+  const todo = reports.flatMap(r => r.events).filter(e => e.type === 'photo' && e.mediaId && e.phone === undefined);
+  if (todo.length && NATIVE && Android.ocr) { toast('Lecture des numéros sur les photos…'); for (const e of todo) await detectPhone(e); save(); }
   const base = (reports.length > 1 ? 'Comptes-rendus' : reports[0].name + '_' + reportSpan(reports[0])).replace(/[^\wÀ-ÿ-]+/g, '_');
   const subj = reports.length > 1 ? `Comptes-rendus (${reports.length})` : `Compte-rendu ${reports[0].name} – ${reportSpan(reports[0])}`;
   if (fmt === 'csv') shareFile(base + '.csv', 'text/csv', b64(buildCSV(reports)), subj);
@@ -607,7 +648,14 @@ const A = {
     const c = cur(); const r = S.reports.find(x => x.id === c.rid); const e = r.events.find(x => x.id === c.id);
     const ts = $('#eTs').value; if (ts) e.ts = new Date(ts).getTime();
     e.category = $('#eCat').value; e.text = $('#eText').value.trim(); e.comment = $('#eCom').value.trim();
+    const ph = $('#ePhone'); if (ph) e.phone = ph.value.trim();
     save(); back();
+  },
+  async rescanPhone() {
+    const c = cur(); const e = S.reports.find(x => x.id === c.rid).events.find(x => x.id === c.id);
+    if (!NATIVE) return toast('Disponible dans l\'application Android');
+    toast('Lecture de la photo…'); delete e.phone;
+    await detectPhone(e); save(); render(); toast(e.phone ? 'Numéro : ' + e.phone : 'Aucun numéro trouvé');
   },
   async addGeoToEvent() { const c = cur(); const e = S.reports.find(x => x.id === c.rid).events.find(x => x.id === c.id); if (await attachGeo(e)) { save(); render(); } },
   async delEvent() { if (!(await confirmBox('Supprimer cet évènement ?'))) return; const c = cur(); const r = S.reports.find(x => x.id === c.rid); const e = r.events.find(x => x.id === c.id); if (e.mediaId) delMedia(e.mediaId); r.events = r.events.filter(x => x !== e); save(); back(); },

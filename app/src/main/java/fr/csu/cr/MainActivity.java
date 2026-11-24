@@ -32,6 +32,14 @@ import android.webkit.WebViewClient;
 import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
@@ -220,6 +228,19 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void ocr(String id, String b64) {
+            try {
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bmp == null) { ocrResult(id, ""); return; }
+                if (recognizer == null) recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+                recognizer.process(InputImage.fromBitmap(bmp, 0))
+                        .addOnSuccessListener(t -> ocrResult(id, t.getText()))
+                        .addOnFailureListener(e -> ocrResult(id, ""));
+            } catch (Exception e) { ocrResult(id, ""); }
+        }
+
+        @JavascriptInterface
         public void printPdf(String html, String jobName) {
             runOnUiThread(() -> {
                 WebView pv = new WebView(MainActivity.this);
@@ -249,6 +270,13 @@ public class MainActivity extends Activity {
             AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
             am.cancel(ReminderReceiver.pending(MainActivity.this, id, "", ""));
         }
+    }
+
+    private TextRecognizer recognizer;
+
+    private void ocrResult(String id, String text) {
+        final String js = "window.__ocr && window.__ocr(" + JSONObject.quote(id) + "," + JSONObject.quote(text == null ? "" : text) + ")";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
     }
 
     private final List<WebView> printViews = new ArrayList<>();
