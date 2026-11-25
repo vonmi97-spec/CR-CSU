@@ -97,7 +97,7 @@ let tab = 'cr';
 const cur = () => stacks[tab][stacks[tab].length - 1];
 function go(v, args = {}) { stacks[tab].push(Object.assign({ v }, args)); render(); $('#view').scrollTop = 0; }
 function back() { if (stacks[tab].length > 1) { stacks[tab].pop(); render(); } }
-window.__back = () => { if (document.getElementById('lock')) return false; if ($('#modalRoot').innerHTML) { closeModal(); return true; } if (stacks[tab].length > 1) { back(); return true; } return false; };
+window.__back = () => { if (document.querySelector('.rpick') && pickerBack) { pickerBack(); return true; } if (document.getElementById('lock')) return false; if ($('#modalRoot').innerHTML) { closeModal(); return true; } if (stacks[tab].length > 1) { back(); return true; } return false; };
 
 function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2300); }
 const ICON = {
@@ -247,7 +247,7 @@ VIEWS.report = c => {
 };
 
 VIEWS.event = c => {
-  c.after = () => { attachAddr($('#eAddr')); attachAddr($('#eDom')); };
+  c.after = () => { attachAddr($('#eDom')); };
   const r = S.reports.find(x => x.id === c.rid); const e = r && r.events.find(x => x.id === c.id);
   if (!e) { stacks[tab].pop(); return VIEWS[cur().v](cur()); }
   setBar('Évènement', backBtn(), `<button class="bbtn" data-a="saveEvent">OK</button>`);
@@ -263,11 +263,10 @@ VIEWS.event = c => {
     <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Texte <button class="mini" data-a="dictText">🎤 Dicter</button></label><textarea id="eText">${esc(e.text || '')}</textarea></div>
     <div class="admbox">
       <div class="field"><label>Administrée :</label><input id="eAdm" value="${esc(e.adm || '')}" placeholder="Nom et prénom" autocapitalize="words"></div>
-      <div class="field"><label>Domiciliation :</label><input id="eDom" value="${esc(e.dom || '')}" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Domiciliation : <button type="button" class="mini rueb" data-for="eDom">🛣️ Choisir une rue</button></label><input id="eDom" value="${esc(e.dom || '')}" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Coordonnées téléphoniques : ${e.phone ? `<a class="mini" style="background:#34a853;text-decoration:none" href="tel:${esc(e.phone.split(/[,;/]/)[0].replace(/\s/g, ''))}">📞 Appeler</a>` : ''}</label><input id="ePhone" type="tel" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.type === 'photo' && e.phone === undefined ? 'Lecture de la photo…' : '06 12 34 56 78'}"></div>
       ${e.type === 'photo' ? `<button class="bigbtn grey" data-a="rescanPhone" style="margin:0 0 10px">Relire le numéro sur la photo</button>` : ''}
     </div>
-    <div class="field"><label>Adresse</label><input id="eAddr" value="${esc(e.address || '')}" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     ${e.lat != null ? `<div class="field"><label>Coordonnées${e.geoTs ? ' (relevées le ' + fDate(e.geoTs) + ' à ' + fTime(e.geoTs) + ')' : ''}</label><div>${e.lat.toFixed(6)}, ${e.lon.toFixed(6)}</div>${e.address ? `<div style="font-size:14px;color:#555;margin-top:4px">${esc(e.address)}</div>` : ''}</div>` : ''}
     <button class="bigbtn grey" data-a="addGeoToEvent">${e.lat != null ? 'Mettre à jour la position' : 'Ajouter ma position'}</button>
     <button class="bigbtn red" data-a="delEvent">Supprimer l'évènement</button></div>`;
@@ -500,6 +499,44 @@ function attachAddr(inp) {
   clear.style.visibility = inp.value ? 'visible' : 'hidden';
 }
 function fillStreets() {}
+/* Animation d'ouverture */
+function splash() {
+  if (sessionStorage.getItem('splashDone')) return; try { sessionStorage.setItem('splashDone', '1'); } catch {}
+  const d = document.createElement('div'); d.id = 'splash';
+  d.innerHTML = `<div class="sp-in"><svg class="sp-logo" viewBox="0 0 120 120"><circle class="sp-ring" cx="60" cy="60" r="52"/><rect class="sp-doc" x="38" y="30" width="44" height="58" rx="6"/><path class="sp-l1" d="M47 48h26"/><path class="sp-l2" d="M47 58h26"/><path class="sp-l3" d="M47 68h16"/><circle class="sp-clk" cx="80" cy="80" r="15"/><path class="sp-hand" d="M80 72v8l6 4"/></svg>
+    <div class="sp-t">CR <span>CSU</span></div><div class="sp-s">Comptes-rendus horodatés</div><div class="sp-bar"><i></i></div></div>`;
+  document.body.appendChild(d);
+  setTimeout(() => d.classList.add('out'), 1700); setTimeout(() => d.remove(), 2200);
+  d.onclick = () => { d.classList.add('out'); setTimeout(() => d.remove(), 400); };
+}
+/* Sélecteur de rue plein écran (garde le numéro déjà tapé) */
+function pickStreet(cur) {
+  return new Promise(ok => {
+    const num = (String(cur || '').match(/^\s*(\d+\s*(?:bis|ter)?)/i) || [])[1] || '';
+    const ov = document.createElement('div'); ov.className = 'rpick';
+    ov.innerHTML = `<div class="rp-top"><button class="bbtn" id="rpX">${ICON.back}Retour</button><b>Choisir une rue</b><span style="width:60px"></span></div>
+      <div class="rp-row"><input id="rpNum" inputmode="numeric" placeholder="N°" value="${esc(num.trim())}"><input id="rpQ" type="search" placeholder="🔍 Rechercher une rue…" autocomplete="off"></div>
+      <div class="rp-list" id="rpL"></div>`;
+    document.body.appendChild(ov);
+    const L = ov.querySelector('#rpL'), Q = ov.querySelector('#rpQ');
+    const draw = () => {
+      const words = norm(Q.value.trim()).split(/\s+/).filter(Boolean);
+      const l = words.length ? RUES.filter(r => { const x = norm(r); return words.every(w => x.includes(w)); }) : RUES;
+      let last = ''; L.innerHTML = l.map(r => { const k = (sortKey(r)[0] || '#').toUpperCase(); const h = !words.length && k !== last ? `<div class="rp-h">${/[A-Z]/.test(k) ? k : '#'}</div>` : ''; last = k; return h + `<button data-r="${esc(r)}">${esc(r)}</button>`; }).join('') || '<div class="hint">Aucune rue trouvée.</div>';
+    };
+    Q.oninput = draw; draw(); setTimeout(() => Q.focus(), 100);
+    const close = v => { ov.remove(); ok(v); };
+    ov.querySelector('#rpX').onclick = () => close(null);
+    L.onclick = e => { const b = e.target.closest('button'); if (!b) return; const n = ov.querySelector('#rpNum').value.trim(); close(fullAddr((n ? n + ' ' : '') + b.dataset.r)); };
+    pickerBack = () => close(null);
+  });
+}
+let pickerBack = null;
+document.addEventListener('click', async e => {
+  const b = e.target.closest('.rueb'); if (!b) return; e.preventDefault(); e.stopPropagation();
+  const inp = document.getElementById(b.dataset.for); if (!inp) return;
+  const v = await pickStreet(inp.value); if (v) { inp.value = v; inp.dispatchEvent(new Event('input')); const box = inp.closest('.field').nextElementSibling; if (box && box.classList.contains('acl')) box.innerHTML = ''; }
+}, true);
 
 /* zoom / déplacement du plan */
 let PZ = null;
@@ -1110,18 +1147,17 @@ function dictate() {
 function textModal(title, value) {
   return new Promise(ok => {
     modal(`<h3>${esc(title)}</h3><div class="field"><textarea id="tmT" style="min-height:110px">${esc(value || '')}</textarea></div>
-      <div class="field"><label>Adresse (facultatif)</label><input id="tmA" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       <details class="admd"><summary>👤 Administrée (facultatif)</summary>
         <div class="field"><label>Administrée :</label><input id="tmAdm" placeholder="Nom et prénom" autocapitalize="words"></div>
-        <div class="field"><label>Domiciliation :</label><input id="tmDom" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Domiciliation : <button type="button" class="mini rueb" data-for="tmDom">🛣️ Choisir une rue</button></label><input id="tmDom" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         <div class="field"><label>Coordonnées téléphoniques :</label><input id="tmTel" type="tel" inputmode="tel" placeholder="06 12 34 56 78"></div>
       </details>
       <button class="bigbtn dict" id="tmD">🎤 Dicter</button>
       <div class="row2"><button class="bigbtn grey" id="tmX">Annuler</button><button class="bigbtn" id="tmOk">OK</button></div>`, true);
-    const ta = $('#tmT'); setTimeout(() => ta.focus(), 50); attachAddr($('#tmA')); attachAddr($('#tmDom'));
+    const ta = $('#tmT'); setTimeout(() => ta.focus(), 50); attachAddr($('#tmDom'));
     $('#tmD').onclick = async () => { const t = await dictate(); if (t && $('#tmT')) { const el = $('#tmT'); el.value = (el.value.trim() ? el.value.trim() + ' ' : '') + t; } };
     $('#tmX').onclick = () => { closeModal(); ok(null); };
-    $('#tmOk').onclick = () => { const v = $('#tmT').value; lastAddr = $('#tmA').value.trim(); lastAdm = { adm: $('#tmAdm').value.trim(), dom: $('#tmDom').value.trim() ? fullAddr($('#tmDom').value.trim()) : '', phone: $('#tmTel').value.trim() }; closeModal(); ok(v); };
+    $('#tmOk').onclick = () => { const v = $('#tmT').value; lastAddr = ''; lastAdm = { adm: $('#tmAdm').value.trim(), dom: $('#tmDom').value.trim() ? fullAddr($('#tmDom').value.trim()) : '', phone: $('#tmTel').value.trim() }; closeModal(); ok(v); };
   });
 }
 
@@ -1314,4 +1350,4 @@ $('#fileRestore').onchange = e => e.target.files[0] && restore(e.target.files[0]
 
 document.addEventListener('focusin', e => { if (e.target.matches('input:not([type=checkbox]),textarea')) document.documentElement.classList.add('kb'); });
 document.addEventListener('focusout', () => setTimeout(() => { const a = document.activeElement; if (!a || !a.matches('input,textarea')) document.documentElement.classList.remove('kb'); }, 50));
-(async () => { await load(); fillStreets(); applyTheme(); applyBig(); applySecure(); lockApp(); render(); checkShift(); setTimeout(() => autoBackup(), 4000); })();
+(async () => { splash(); await load(); fillStreets(); applyTheme(); applyBig(); applySecure(); lockApp(); render(); checkShift(); setTimeout(() => autoBackup(), 4000); })();

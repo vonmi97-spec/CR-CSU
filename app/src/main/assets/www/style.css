@@ -279,3 +279,39 @@ html.kb #tabs{display:none}
 .admbox{border-left:4px solid #8b5cf6;padding-left:8px;margin-bottom:10px}
 .admd{margin-bottom:8px}.admd summary{font-weight:600;padding:8px 2px;color:#8b5cf6}
 html.dark .adm span{color:#98989d}
+
+/* sélecteur de rue */
+.rpick{position:fixed;inset:0;z-index:70;background:#eef0f3;display:flex;flex-direction:column}
+.rp-top{display:flex;align-items:center;justify-content:space-between;background:#2a2c2e;color:#fff;padding:calc(env(safe-area-inset-top) + 10px) 10px 10px}
+.rp-row{display:flex;gap:8px;padding:10px 12px}
+.rp-row input{border:0;border-radius:10px;padding:12px;font-size:16px;background:#fff;outline:none;color:#111}
+#rpNum{width:70px;text-align:center}#rpQ{flex:1}
+.rp-list{flex:1;overflow-y:auto}
+.rp-list button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #e3e5e8;background:#fff;padding:14px 16px;font-size:16px;color:#111}
+.rp-list button:active{background:#dde3ea}
+.rp-h{position:sticky;top:0;background:#e2e5ea;color:#3c4a8c;font-weight:700;padding:4px 16px;font-size:13px}
+html.dark .rpick{background:#000}html.dark .rp-top{background:#000;border-bottom:1px solid #1c1c1e}
+html.dark .rp-row input,html.dark .rp-list button{background:#1c1c1e;color:#f2f2f7;border-color:#2c2c2e}
+html.dark .rp-h{background:#2c2c2e;color:#8fa2ff}
+/* animation d'ouverture */
+#splash{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,#33363a,#151618 70%);transition:opacity .45s ease,transform .45s ease}
+#splash.out{opacity:0;transform:scale(1.08);pointer-events:none}
+.sp-in{text-align:center;color:#fff}
+.sp-logo{width:130px;height:130px;overflow:visible}
+.sp-ring{fill:none;stroke:#2f7cf6;stroke-width:5;stroke-dasharray:327;stroke-dashoffset:327;transform:rotate(-90deg);transform-origin:60px 60px;animation:spDraw 1s ease forwards}
+.sp-doc{fill:#fff;opacity:0;transform:translateY(12px);animation:spUp .45s .35s ease forwards}
+.sp-l1,.sp-l2,.sp-l3{stroke:#2f7cf6;stroke-width:4;stroke-linecap:round;stroke-dasharray:30;stroke-dashoffset:30}
+.sp-l1{animation:spLine .3s .7s ease forwards}.sp-l2{animation:spLine .3s .85s ease forwards}.sp-l3{animation:spLine .3s 1s ease forwards}
+.sp-clk{fill:#34c759;stroke:#151618;stroke-width:3;transform:scale(0);transform-origin:80px 80px;animation:spPop .4s 1.05s cubic-bezier(.3,1.6,.5,1) forwards}
+.sp-hand{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;opacity:0;transform-origin:80px 80px;animation:spHand .9s 1.2s ease forwards}
+.sp-t{font-size:34px;font-weight:800;letter-spacing:2px;margin-top:14px;opacity:0;animation:spFade .5s .6s ease forwards}.sp-t span{color:#2f7cf6}
+.sp-s{font-size:14px;color:#9a9da2;margin-top:4px;opacity:0;animation:spFade .5s .8s ease forwards}
+.sp-bar{width:140px;height:4px;border-radius:2px;background:#ffffff22;margin:22px auto 0;overflow:hidden}
+.sp-bar i{display:block;height:100%;width:0;background:#2f7cf6;animation:spBar 1.5s .1s ease forwards}
+@keyframes spDraw{to{stroke-dashoffset:0}}
+@keyframes spUp{to{opacity:1;transform:none}}
+@keyframes spLine{to{stroke-dashoffset:0}}
+@keyframes spPop{to{transform:scale(1)}}
+@keyframes spHand{0%{opacity:1;transform:rotate(-120deg)}100%{opacity:1;transform:rotate(0)}}
+@keyframes spFade{to{opacity:1}}
+@keyframes spBar{to{width:100%}}
