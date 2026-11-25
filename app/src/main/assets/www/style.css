@@ -248,3 +248,15 @@ html.dark .search{background:#000}html.dark .search input{background:#1c1c1e;col
 html.dark .colors,html.dark .sumc div,html.dark .sumt{background:#1c1c1e;color:#f2f2f7}
 html.dark .sumc span{color:#aaa}
 html.dark .ev.flash{animation:none;background:#3a3410}
+
+/* --- plan --- */
+.tab.on[data-tab="plan"]{color:#ff5e57}
+.pz{position:relative;height:62vh;overflow:hidden;background:#dfe3d8;touch-action:none}
+.pz.full{position:fixed;inset:0;height:auto;z-index:40;background:#111}
+.pz img{position:absolute;left:0;top:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;max-width:none}
+.pzb{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:8px;z-index:2}
+.pz.full .pzb{bottom:calc(env(safe-area-inset-bottom) + 20px)}
+.pzb button{width:44px;height:44px;border-radius:12px;border:0;background:#fffe;box-shadow:0 2px 6px #0004;font-size:22px;font-weight:700;color:#222}
+a.call{color:#2f7cf6;font-weight:700;text-decoration:none;font-size:16px;white-space:nowrap;padding:6px 0 6px 8px}
+html.dark .pzb button{background:#2c2c2ee6;color:#fff}
+html.dark .pz{background:#111}

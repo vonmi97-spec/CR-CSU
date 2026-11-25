@@ -37,6 +37,13 @@ const DEFAULT = () => ({
   ],
   buttons: ['c1|Ronde caméras', 'c1|Individu suspect', 'c2|Appel police', 'c2|Appel pompiers', 'c3|Accident', 'c3|Rixe'],
   reminders: [],
+  phones: [
+    { n: 'Police secours', t: '17', ok: 1 }, { n: 'Pompiers', t: '18', ok: 1 }, { n: 'SAMU', t: '15', ok: 1 }, { n: 'Urgence européenne', t: '112', ok: 1 },
+    { n: 'Mairie de Yerres', t: '01 69 49 76 00', ok: 1 }, { n: 'Mairie annexe', t: '01 69 49 77 16' },
+    { n: 'Police municipale', t: '01 69 49 77 66', ok: 1 }, { n: 'Services techniques', t: '01 69 49 77 00', ok: 1 },
+    { n: 'AMIE (3e âge)', t: '0800 64 85 26' }, { n: 'Allô M. le Maire', t: '0800 22 12 02' },
+    { n: 'Allô propreté', t: '0800 91 330' }, { n: 'Éclairage public', t: '0800 77 02 02' }
+  ],
   settings: {
     defaultName: 'CSU', validation: 'auto', sortReports: 'date', sortEvents: 'date', useEndDate: false,
     timeFormat: 'sans', maxButtons: '9', btnCols: '3', imageQuality: 'moyenne', videoQuality: 'moyenne', autoGeo: false, lang: 'fr',
@@ -54,7 +61,7 @@ async function load() {
   if (!S) S = DEFAULT();
   const d = DEFAULT();
   S.settings = Object.assign(d.settings, S.settings || {});
-  for (const k of ['profile', 'sections', 'categories', 'buttons', 'reminders', 'reports']) if (!S[k]) S[k] = d[k];
+  for (const k of ['profile', 'sections', 'categories', 'buttons', 'reminders', 'phones', 'reports']) if (!S[k]) S[k] = d[k];
 }
 let saveT;
 function save() { clearTimeout(saveT); saveT = setTimeout(() => idb('kv', 'readwrite', s => s.put(S, 'state')), 150); }
@@ -85,7 +92,7 @@ function sortedEvents(r) {
 }
 
 /* ---------- UI de base ---------- */
-const stacks = { cr: [{ v: 'sections' }], export: [{ v: 'export' }], settings: [{ v: 'settings' }], about: [{ v: 'about' }] };
+const stacks = { cr: [{ v: 'sections' }], export: [{ v: 'export' }], plan: [{ v: 'plan' }], settings: [{ v: 'settings' }], about: [{ v: 'about' }] };
 let tab = 'cr';
 const cur = () => stacks[tab][stacks[tab].length - 1];
 function go(v, args = {}) { stacks[tab].push(Object.assign({ v }, args)); render(); $('#view').scrollTop = 0; }
@@ -414,6 +421,58 @@ VIEWS.reminders = () => {
   return (l.map(r => `<div class="cell"><div class="grow"><div class="t" style="font-weight:600">${esc(r.label)}</div><div class="s">${fDate(r.at)} à ${fTime(r.at)}${r.at < Date.now() ? ' — passé' : ''}</div></div><button class="del" data-a="delReminder" data-id="${r.id}">Suppr.</button></div>`).join('') || '<div class="empty">Aucun rappel.</div>') +
     '<div class="hint">Une notification s\'affiche sur le téléphone à l\'heure du rappel.</div>';
 };
+/* --- Plan de la ville --- */
+const QUARTIERS = [
+  ['#cfd8ea', 'Grosbois / Sablière / Mare-Armée'], ['#a9b8dd', 'Bellevue / Centre-ville'], ['#f2b98a', 'Rives de l\'Yerres / Tournelles'],
+  ['#c9c3cf', 'Gambetta / Brossolette / Belvédère'], ['#ecd3cf', 'Bout du Monde / Camaldules / Abbaye'], ['#f3d21f', 'Concy / Grands Godeaux / Gare'], ['#f6e48a', 'Taillis / Garenne']
+];
+let planSrc = '';
+async function planURL() { const b = await getMedia('plan_custom'); return b ? URL.createObjectURL(b) : 'plan_yerres.jpg'; }
+VIEWS.plan = c => {
+  setBar('Plan de Yerres', '', `<button class="bbtn" data-a="planMenu">•••</button>`);
+  c.after = async () => { planSrc = planSrc || await planURL(); const img = $('#pzImg'); if (img) { img.src = planSrc; initZoom($('#pz'), img); } };
+  return `<div class="pz" id="pz"><img id="pzImg" alt="Plan" draggable="false"><div class="pzb"><button data-a="pzIn">＋</button><button data-a="pzOut">－</button><button data-a="pzFit">⤢</button><button data-a="pzFull">⛶</button></div></div>
+    <div class="hint">Pincez pour zoomer, glissez pour vous déplacer, double-tap pour agrandir.</div>
+    <div class="cell" data-a="openMaps"><span style="font-size:20px">🗺️</span><div class="grow"><div class="t" style="font-weight:600">Ouvrir Yerres dans Maps</div><div class="s">Carte détaillée et itinéraires (internet)</div></div><span class="chev">›</span></div>
+    <div class="group">Quartiers</div>
+    ${QUARTIERS.map(([col, n]) => `<div class="cell"><span style="width:22px;height:22px;border-radius:5px;background:${col};border:1px solid #0002;flex:0 0 auto"></span><div class="grow">${esc(n)}</div></div>`).join('')}
+    <div class="group" style="display:flex;justify-content:space-between;align-items:center">Numéros utiles <button class="mini" data-a="addPhone" style="background:#2f7cf6">＋ Ajouter</button></div>
+    ${S.phones.map((x, i) => `<div class="cell" data-a="phoneMenu" data-i="${i}"><span style="font-size:18px">📞</span><div class="grow"><div style="font-weight:600">${esc(x.n)}</div>${x.ok ? '' : '<div class="s">Lu sur le plan — à vérifier</div>'}</div><a class="call" href="tel:${esc(x.t.replace(/\s/g, ''))}" data-noop="1">${esc(x.t)}</a></div>`).join('')}
+    <div style="height:24px"></div>`;
+};
+
+/* zoom / déplacement du plan */
+let PZ = null;
+function initZoom(box, img) {
+  const z = PZ = { box, img, s: 1, x: 0, y: 0, min: 1, pts: new Map(), last: null, tap: 0 };
+  const fit = () => { const bw = box.clientWidth, bh = box.clientHeight, iw = img.naturalWidth || 1, ih = img.naturalHeight || 1; z.min = Math.min(bw / iw, bh / ih); z.s = z.min; z.x = (bw - iw * z.s) / 2; z.y = (bh - ih * z.s) / 2; apply(); };
+  const clamp = () => { const bw = box.clientWidth, bh = box.clientHeight, w = img.naturalWidth * z.s, h = img.naturalHeight * z.s;
+    z.x = w <= bw ? (bw - w) / 2 : Math.min(0, Math.max(bw - w, z.x)); z.y = h <= bh ? (bh - h) / 2 : Math.min(0, Math.max(bh - h, z.y)); };
+  const apply = () => { clamp(); img.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`; };
+  z.zoomAt = (f, cx, cy) => { const ns = Math.max(z.min, Math.min(z.min * 8, z.s * f)); const k = ns / z.s; z.x = cx - (cx - z.x) * k; z.y = cy - (cy - z.y) * k; z.s = ns; apply(); };
+  z.fit = fit;
+  if (img.complete && img.naturalWidth) fit(); else img.onload = fit;
+  const rel = e => { const b = box.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+  box.onpointerdown = e => {
+    if (e.target.closest('.pzb')) return;
+    box.setPointerCapture(e.pointerId); z.pts.set(e.pointerId, rel(e));
+    if (z.pts.size === 1) { const now = Date.now(); if (now - z.tap < 300) { const [cx, cy] = rel(e); img.style.transition = 'transform .2s'; z.s > z.min * 1.5 ? fit() : z.zoomAt(2.5, cx, cy); setTimeout(() => img.style.transition = '', 220); z.tap = 0; } else z.tap = now; }
+    z.last = null;
+  };
+  box.onpointermove = e => {
+    if (!z.pts.has(e.pointerId)) return;
+    const prev = z.pts.get(e.pointerId); const cur = rel(e); z.pts.set(e.pointerId, cur);
+    if (z.pts.size === 1) { z.x += cur[0] - prev[0]; z.y += cur[1] - prev[1]; apply(); }
+    else if (z.pts.size === 2) {
+      const [a, b] = [...z.pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (z.last) { z.x += m[0] - z.last.m[0]; z.y += m[1] - z.last.m[1]; z.zoomAt(d / z.last.d, m[0], m[1]); }
+      z.last = { d, m };
+    }
+  };
+  box.onpointerup = box.onpointercancel = e => { z.pts.delete(e.pointerId); z.last = null; };
+  box.onwheel = e => { e.preventDefault(); const [cx, cy] = rel(e); z.zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, cx, cy); };
+}
+
 VIEWS.about = () => {
   setBar('À propos');
   return `<div class="about"><div class="logo">CR</div><h2 style="margin:0">CR CSU</h2><div style="color:#777">Version 1.2</div>
@@ -428,8 +487,8 @@ async function mediaURL(id) { if (urlCache[id]) return urlCache[id]; const b = a
 function hydrateMedia() { document.querySelectorAll('[data-media]').forEach(async el => { el.src = await mediaURL(el.dataset.media); }); }
 const blobToDataURL = b => new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(b); });
 async function dataURLToBlob(u) { return (await fetch(u)).blob(); }
-function compressImage(file) {
-  const max = { basse: 640, moyenne: 1024, haute: 1600 }[S.settings.imageQuality] || 1024;
+function compressImage(file, maxOv) {
+  const max = maxOv || { basse: 640, moyenne: 1024, haute: 1600 }[S.settings.imageQuality] || 1024;
   const q = { basse: .55, moyenne: .68, haute: .82 }[S.settings.imageQuality] || .68;
   if (window.createImageBitmap) return (async () => {
     try {
@@ -773,6 +832,24 @@ const A = {
   mic() { recordAudio(); },
   async text() { const v = await textModal('Nouvel évènement', ''); if (v && v.trim()) newEvent({ type: 'text', text: v.trim() }); },
   qTab(d) { qTab = d.id; render(); },
+  pzIn() { if (PZ) PZ.zoomAt(1.6, PZ.box.clientWidth / 2, PZ.box.clientHeight / 2); },
+  pzOut() { if (PZ) PZ.zoomAt(1 / 1.6, PZ.box.clientWidth / 2, PZ.box.clientHeight / 2); },
+  pzFit() { if (PZ) PZ.fit(); },
+  pzFull() { const b = $('#pz'); if (!b) return; b.classList.toggle('full'); setTimeout(() => PZ && PZ.fit(), 30); },
+  openMaps() { location.href = 'geo:48.7175,2.4925?q=Yerres%2091330'; },
+  async planMenu() {
+    const k = await sheet('Plan', [['photo', 'Remplacer par une photo du plan'], ['reset', 'Revenir au plan d\'origine']]);
+    if (k === 'photo') pickImage(async f => { await putMedia('plan_custom', await compressImage(f, 2600)); planSrc = ''; render(); toast('Plan remplacé'); });
+    if (k === 'reset') { await delMedia('plan_custom'); planSrc = ''; render(); }
+  },
+  async phoneMenu(d) {
+    const x = S.phones[d.i];
+    const k = await sheet(`${x.n} — ${x.t}`, [['call', '📞 Appeler'], ['edit', 'Modifier'], ['del', 'Supprimer']]);
+    if (k === 'call') location.href = 'tel:' + x.t.replace(/\s/g, '');
+    if (k === 'edit') { const v = await ask('Modifier le numéro', [{ label: 'Nom', value: x.n }, { label: 'Numéro', type: 'tel', value: x.t }]); if (v && v[0].trim() && v[1].trim()) { x.n = v[0].trim(); x.t = v[1].trim(); x.ok = 1; save(); render(); } }
+    if (k === 'del' && await confirmBox(`Supprimer « ${x.n} » ?`)) { S.phones.splice(d.i, 1); save(); render(); }
+  },
+  async addPhone() { const v = await ask('Nouveau numéro', [{ label: 'Nom' }, { label: 'Numéro', type: 'tel' }]); if (v && v[0].trim() && v[1].trim()) { S.phones.push({ n: v[0].trim(), t: v[1].trim(), ok: 1 }); save(); render(); } },
   async dictText() { const t = await dictate(); const el = $('#eText'); if (t && el) el.value = (el.value.trim() ? el.value.trim() + ' ' : '') + t; },
   openHit(d) { draft = null; go('report', { id: d.r, hl: d.e }); },
   setCatColor(d) { const k = S.categories.find(x => x.id === cur().id); k.color = d.c; save(); render(); },
@@ -1136,6 +1213,7 @@ function applySecure() { if (NATIVE && Android.setSecure) Android.setSecure(!!S.
 
 /* ---------- Événements globaux ---------- */
 document.addEventListener('click', e => {
+  if (e.target.closest('a.call')) return;
   const t = e.target.closest('[data-a]'); if (!t || t.closest('#modalRoot')) return;
   if (t.classList.contains('ev')) { if (Date.now() - swipedAt < 400) return; if (t.classList.contains('open')) { closeSwipes(); return; } }
   const fn = A[t.dataset.a]; if (fn) { e.stopPropagation(); fn(Object.assign({}, t.dataset)); }
