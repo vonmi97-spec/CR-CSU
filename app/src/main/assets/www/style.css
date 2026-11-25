@@ -262,3 +262,15 @@ html.dark .pzb button{background:#2c2c2ee6;color:#fff}
 html.dark .pz{background:#111}
 
 .rues{max-height:46vh;overflow-y:auto}
+
+/* saisie d'adresse */
+.acw{display:flex;align-items:center;gap:6px}
+.acw input{flex:1}
+.acx{border:0;background:#c7c9cd;color:#fff;width:24px;height:24px;border-radius:50%;font-size:12px;line-height:24px;padding:0;flex:0 0 auto}
+.acl{margin:-6px 0 10px;border-radius:0 0 10px 10px;overflow:hidden}
+.acl:empty{display:none}
+.acl button{display:block;width:100%;text-align:left;border:0;border-top:1px solid #e3e5e8;background:#fff;padding:13px 14px;font-size:16px;color:#111}
+.acl button:active{background:#e3e7ec}
+html.dark .acl button{background:#2c2c2e;color:#f2f2f7;border-top-color:#3a3a3c}
+html.dark .acx{background:#636366}
+html.kb #tabs{display:none}

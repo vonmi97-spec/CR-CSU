@@ -247,6 +247,7 @@ VIEWS.report = c => {
 };
 
 VIEWS.event = c => {
+  c.after = () => attachAddr($('#eAddr'));
   const r = S.reports.find(x => x.id === c.rid); const e = r && r.events.find(x => x.id === c.id);
   if (!e) { stacks[tab].pop(); return VIEWS[cur().v](cur()); }
   setBar('Évènement', backBtn(), `<button class="bbtn" data-a="saveEvent">OK</button>`);
@@ -262,7 +263,7 @@ VIEWS.event = c => {
     ${e.type === 'photo' ? `<div class="field"><label>Numéro lu sur la photo</label><input id="ePhone" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.phone === undefined ? 'Analyse en cours…' : 'Aucun numéro détecté'}"></div><button class="bigbtn grey" data-a="rescanPhone">Relire le numéro sur la photo</button>` : ''}
     <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Texte <button class="mini" data-a="dictText">🎤 Dicter</button></label><textarea id="eText">${esc(e.text || '')}</textarea></div>
     <div class="field"><label>Commentaire</label><textarea id="eCom">${esc(e.comment || '')}</textarea></div>
-    <div class="field"><label>Adresse</label><input id="eAddr" list="dlRues" value="${esc(e.address || '')}" placeholder="Rue de Yerres…" autocomplete="off"></div>
+    <div class="field"><label>Adresse</label><input id="eAddr" value="${esc(e.address || '')}" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     ${e.lat != null ? `<div class="field"><label>Coordonnées${e.geoTs ? ' (relevées le ' + fDate(e.geoTs) + ' à ' + fTime(e.geoTs) + ')' : ''}</label><div>${e.lat.toFixed(6)}, ${e.lon.toFixed(6)}</div>${e.address ? `<div style="font-size:14px;color:#555;margin-top:4px">${esc(e.address)}</div>` : ''}</div>` : ''}
     <button class="bigbtn grey" data-a="addGeoToEvent">${e.lat != null ? 'Mettre à jour la position' : 'Ajouter ma position'}</button>
     <button class="bigbtn red" data-a="delEvent">Supprimer l'évènement</button></div>`;
@@ -458,7 +459,43 @@ function renderRues(q) {
   const l = words.length ? RUES.filter(r => { const x = norm(r); return words.every(w => x.includes(w)); }) : RUES;
   box.innerHTML = (l.length ? '' : '<div class="hint">Aucune voie trouvée.</div>') + l.map(r => `<div class="cell" data-a="rueMenu" data-r="${esc(r)}"><span style="font-size:15px">🛣️</span><div class="grow">${esc(r)}</div><span class="chev">›</span></div>`).join('');
 }
-function fillStreets() { const d = $('#dlRues'); if (d && !d.children.length) d.innerHTML = RUES.map(r => `<option value="${esc(r)}">`).join(''); }
+/* Saisie d'adresse : suggestions sous le champ (numéro accepté : « 12 rené coty ») */
+function matchRues(q, max = 6) {
+  const m = q.trim().match(/^(\d+\s*(?:bis|ter)?)[\s,]*(.*)$/i); const num = m ? m[1].trim().replace(/\s+/g, ' ') : ''; const rest = m ? m[2] : q.trim();
+  const words = norm(rest).split(/\s+/).filter(w => w && !['rue', 'de', 'la', 'le', 'les', 'des', 'du', 'd', 'l'].includes(w));
+  if (!words.length) return { num, list: [] };
+  const scored = [];
+  for (const r of RUES) {
+    const x = norm(r); if (!words.every(w => x.includes(w))) continue;
+    const k = sortKey(r); scored.push([words.some(w => k.startsWith(w)) ? 0 : 1, k.length, r]);
+  }
+  scored.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  return { num, list: scored.slice(0, max).map(x => x[2]) };
+}
+function attachAddr(inp) {
+  if (!inp || inp._ac) return; inp._ac = true;
+  const field = inp.closest('.field') || inp.parentNode;
+  const wrap = document.createElement('div'); wrap.className = 'acw';
+  wrap.innerHTML = '<button type="button" class="acx" title="Effacer">✕</button>';
+  inp.parentNode.insertBefore(wrap, inp); wrap.prepend(inp);
+  const box = document.createElement('div'); box.className = 'acl'; field.after(box);
+  const clear = wrap.querySelector('.acx');
+  const show = () => {
+    clear.style.visibility = inp.value ? 'visible' : 'hidden';
+    const v = inp.value.replace(/,\s*91330 Yerres$/i, '');
+    const { num, list } = matchRues(v);
+    if (!list.length || (list.length === 1 && list[0] === v.replace(/^\d+\s*(bis|ter)?\s*/i, ''))) { box.innerHTML = ''; return; }
+    box.innerHTML = list.map(r => `<button type="button" data-v="${esc((num ? num + ' ' : '') + r)}">📍 ${num ? `<b>${esc(num)}</b> ` : ''}${esc(r)}</button>`).join('');
+  };
+  inp.addEventListener('input', show);
+  inp.addEventListener('focus', () => { show(); setTimeout(() => field.scrollIntoView({ block: 'start', behavior: 'smooth' }), 300); });
+  box.addEventListener('pointerdown', e => e.preventDefault());
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; inp.value = fullAddr(b.dataset.v); box.innerHTML = ''; clear.style.visibility = 'visible'; inp.blur(); });
+  clear.addEventListener('pointerdown', e => e.preventDefault());
+  clear.addEventListener('click', () => { inp.value = ''; box.innerHTML = ''; clear.style.visibility = 'hidden'; inp.focus(); });
+  clear.style.visibility = inp.value ? 'visible' : 'hidden';
+}
+function fillStreets() {}
 
 /* zoom / déplacement du plan */
 let PZ = null;
@@ -1060,10 +1097,10 @@ function dictate() {
 function textModal(title, value) {
   return new Promise(ok => {
     modal(`<h3>${esc(title)}</h3><div class="field"><textarea id="tmT" style="min-height:110px">${esc(value || '')}</textarea></div>
-      <div class="field"><label>Adresse (facultatif)</label><input id="tmA" list="dlRues" placeholder="Commencez à taper une rue de Yerres…" autocomplete="off"></div>
+      <div class="field"><label>Adresse (facultatif)</label><input id="tmA" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       <button class="bigbtn dict" id="tmD">🎤 Dicter</button>
       <div class="row2"><button class="bigbtn grey" id="tmX">Annuler</button><button class="bigbtn" id="tmOk">OK</button></div>`, true);
-    const ta = $('#tmT'); setTimeout(() => ta.focus(), 50);
+    const ta = $('#tmT'); setTimeout(() => ta.focus(), 50); attachAddr($('#tmA'));
     $('#tmD').onclick = async () => { const t = await dictate(); if (t && $('#tmT')) { const el = $('#tmT'); el.value = (el.value.trim() ? el.value.trim() + ' ' : '') + t; } };
     $('#tmX').onclick = () => { closeModal(); ok(null); };
     $('#tmOk').onclick = () => { const v = $('#tmT').value; lastAddr = $('#tmA').value.trim(); closeModal(); ok(v); };
@@ -1257,4 +1294,6 @@ document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
 for (const id of ['fileGallery', 'filePhoto', 'fileVideo']) $('#' + id).onchange = e => handleFile(e.target.files[0]);
 $('#fileRestore').onchange = e => e.target.files[0] && restore(e.target.files[0]);
 
+document.addEventListener('focusin', e => { if (e.target.matches('input:not([type=checkbox]),textarea')) document.documentElement.classList.add('kb'); });
+document.addEventListener('focusout', () => setTimeout(() => { const a = document.activeElement; if (!a || !a.matches('input,textarea')) document.documentElement.classList.remove('kb'); }, 50));
 (async () => { await load(); fillStreets(); applyTheme(); applyBig(); applySecure(); lockApp(); render(); checkShift(); setTimeout(() => autoBackup(), 4000); })();
