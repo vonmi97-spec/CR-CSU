@@ -933,7 +933,8 @@ const A = {
   async text() {
     lastAdm = {}; const v = await textModal('Nouvel évènement', ''); if (v === null) return; const a = lastAddr;
     const extra = {}; for (const k of ['adm', 'dom', 'phone']) if (lastAdm[k]) extra[k] = lastAdm[k];
-    if ((v && v.trim()) || a || Object.keys(extra).length) newEvent(Object.assign({ type: 'text', text: (v || '').trim() }, a ? { address: fullAddr(a) } : {}, extra));
+    if (lastCat.category) { extra.category = lastCat.category; extra.cat = lastCat.cat; }
+    if ((v && v.trim()) || a || Object.keys(extra).length) newEvent(Object.assign({ type: lastCat.category ? 'action' : 'text', text: (v || '').trim() }, a ? { address: fullAddr(a) } : {}, extra));
   },
   qTab(d) { qTab = d.id; render(); },
   async rueMenu(d) {
@@ -944,7 +945,7 @@ const A = {
     if (k === 'copy') { try { await navigator.clipboard.writeText(d.r); toast('Copié'); } catch { toast(d.r); } }
     if (k === 'note' && rep0) {
       const v = await textModal('Note — ' + d.r, ''); if (v === null) return;
-      rep0.events.push({ id: uid(), ts: Date.now(), type: 'text', text: (v || '').trim(), address: fullAddr(lastAddr || d.r) }); save(); toast('Note ajoutée dans ' + rep0.name);
+      rep0.events.push({ id: uid(), ts: Date.now(), type: lastCat.category ? 'action' : 'text', category: lastCat.category, cat: lastCat.cat, text: (v || '').trim(), address: fullAddr(lastAddr || d.r) }); save(); toast('Note ajoutée dans ' + rep0.name);
     }
   },
   pzIn() { if (PZ) PZ.zoomAt(1.6, PZ.box.clientWidth / 2, PZ.box.clientHeight / 2); },
@@ -1134,7 +1135,7 @@ function showSummary(reports) {
 }
 
 /* ---------- Dictée vocale ---------- */
-let dictCb = null, lastAddr = '', lastAdm = {};
+let dictCb = null, lastAddr = '', lastAdm = {}, lastCat = {};
 window.__dict = t => { const cb = dictCb; dictCb = null; cb && cb(t); };
 function dictate() {
   return new Promise(ok => {
@@ -1146,7 +1147,10 @@ function dictate() {
 }
 function textModal(title, value) {
   return new Promise(ok => {
-    modal(`<h3>${esc(title)}</h3><div class="field"><textarea id="tmT" style="min-height:110px">${esc(value || '')}</textarea></div>
+    const cats = S.categories.filter(k => k.actions.length); let tabK = cats[0] ? cats[0].id : null; lastCat = {};
+    modal(`<h3>${esc(title)}</h3>
+      ${cats.length ? `<div class="field tmc"><label>1. Catégorie</label><div class="qtabs" id="tmTabs"></div><div class="cpick" id="tmChips"></div></div>` : ''}
+      <div class="field"><label>${cats.length ? '2. ' : ''}Texte</label><textarea id="tmT" style="min-height:96px" placeholder="Décrivez l'évènement…">${esc(value || '')}</textarea></div>
       <details class="admd"><summary>👤 Administrée (facultatif)</summary>
         <div class="field"><label>Administrée :</label><input id="tmAdm" placeholder="Nom et prénom" autocapitalize="words"></div>
         <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Domiciliation : <button type="button" class="mini rueb" data-for="tmDom">🛣️ Choisir une rue</button></label><input id="tmDom" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
@@ -1154,7 +1158,18 @@ function textModal(title, value) {
       </details>
       <button class="bigbtn dict" id="tmD">🎤 Dicter</button>
       <div class="row2"><button class="bigbtn grey" id="tmX">Annuler</button><button class="bigbtn" id="tmOk">OK</button></div>`, true);
-    const ta = $('#tmT'); setTimeout(() => ta.focus(), 50); attachAddr($('#tmDom'));
+    const ta = $('#tmT'); if (!cats.length) setTimeout(() => ta.focus(), 50); attachAddr($('#tmDom'));
+    const drawCats = () => {
+      const T = $('#tmTabs'), C = $('#tmChips'); if (!T) return;
+      T.innerHTML = cats.map(k => `<button type="button" class="${k.id === tabK ? 'on' : ''}" data-k="${k.id}" style="--c:${catColor(k)}">${esc(k.name)}${lastCat.cat === k.id ? ' ✓' : ''}</button>`).join('');
+      const k = cats.find(x => x.id === tabK);
+      C.innerHTML = k.actions.map(a => `<button type="button" class="chip ${lastCat.category === a && lastCat.cat === k.id ? 'on' : ''}" data-v="${esc(a)}" style="--c:${catColor(k)}">${esc(a)}</button>`).join('');
+    };
+    if (cats.length) {
+      drawCats();
+      $('#tmTabs').onclick = e => { const b = e.target.closest('button'); if (b) { tabK = b.dataset.k; drawCats(); } };
+      $('#tmChips').onclick = e => { const b = e.target.closest('button'); if (!b) return; lastCat = lastCat.category === b.dataset.v && lastCat.cat === tabK ? {} : { category: b.dataset.v, cat: tabK }; drawCats(); };
+    }
     $('#tmD').onclick = async () => { const t = await dictate(); if (t && $('#tmT')) { const el = $('#tmT'); el.value = (el.value.trim() ? el.value.trim() + ' ' : '') + t; } };
     $('#tmX').onclick = () => { closeModal(); ok(null); };
     $('#tmOk').onclick = () => { const v = $('#tmT').value; lastAddr = ''; lastAdm = { adm: $('#tmAdm').value.trim(), dom: $('#tmDom').value.trim() ? fullAddr($('#tmDom').value.trim()) : '', phone: $('#tmTel').value.trim() }; closeModal(); ok(v); };

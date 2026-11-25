@@ -315,3 +315,6 @@ html.dark .rp-h{background:#2c2c2e;color:#8fa2ff}
 @keyframes spHand{0%{opacity:1;transform:rotate(-120deg)}100%{opacity:1;transform:rotate(0)}}
 @keyframes spFade{to{opacity:1}}
 @keyframes spBar{to{width:100%}}
+
+.tmc .qtabs{margin-bottom:6px}
+.tmc .chip.on{background:var(--c,#2f7cf6)!important;border-color:var(--c,#2f7cf6)!important;color:#fff!important}
