@@ -233,7 +233,7 @@ VIEWS.report = c => {
   return `<div class="report">
     <div class="events">${list || '<div class="empty">Aucun évènement.<br>Utilisez les boutons ci-dessous.</div>'}</div>
     <div class="panel">
-      ${draft ? `<div class="draft">${evHTML(draft, true)}<textarea id="draftCom" placeholder="Commentaire (facultatif)">${esc(draft.comment || '')}</textarea></div>` : ''}
+      ${draft ? `<div class="draft">${evHTML(draft, true)}</div>` : ''}
       ${qtabs}<div class="qbtns c${S.settings.btnCols || 3}">${btns || '<button class="qbtn none" data-a="gotoButtons">Configurer les boutons (Paramètres › Boutons)</button>'}</div>
       <div class="tools">
         <button class="tool" data-a="gallery">${ICON.gallery}</button>
@@ -262,7 +262,6 @@ VIEWS.event = c => {
       ${e.category && !cats.includes(e.category) ? `<div class="cpick"><button type="button" class="chip on" data-a="pickCat" data-v="${esc(e.category)}">${esc(e.category)}</button></div>` : ''}</div>
     ${e.type === 'photo' ? `<div class="field"><label>Numéro lu sur la photo</label><input id="ePhone" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.phone === undefined ? 'Analyse en cours…' : 'Aucun numéro détecté'}"></div><button class="bigbtn grey" data-a="rescanPhone">Relire le numéro sur la photo</button>` : ''}
     <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Texte <button class="mini" data-a="dictText">🎤 Dicter</button></label><textarea id="eText">${esc(e.text || '')}</textarea></div>
-    <div class="field"><label>Commentaire</label><textarea id="eCom">${esc(e.comment || '')}</textarea></div>
     <div class="field"><label>Adresse</label><input id="eAddr" value="${esc(e.address || '')}" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     ${e.lat != null ? `<div class="field"><label>Coordonnées${e.geoTs ? ' (relevées le ' + fDate(e.geoTs) + ' à ' + fTime(e.geoTs) + ')' : ''}</label><div>${e.lat.toFixed(6)}, ${e.lon.toFixed(6)}</div>${e.address ? `<div style="font-size:14px;color:#555;margin-top:4px">${esc(e.address)}</div>` : ''}</div>` : ''}
     <button class="bigbtn grey" data-a="addGeoToEvent">${e.lat != null ? 'Mettre à jour la position' : 'Ajouter ma position'}</button>
@@ -975,7 +974,7 @@ const A = {
   saveEvent() {
     const c = cur(); const r = S.reports.find(x => x.id === c.rid); const e = r.events.find(x => x.id === c.id);
     const ts = +$('#eTs').value; if (ts) e.ts = ts;
-    e.category = $('#eCat').value; e.text = $('#eText').value.trim(); e.comment = $('#eCom').value.trim();
+    e.category = $('#eCat').value; e.text = $('#eText').value.trim(); 
     const ph = $('#ePhone'); if (ph) e.phone = ph.value.trim();
     const ad = $('#eAddr'); if (ad) e.address = ad.value.trim() ? fullAddr(ad.value.trim()) : '';
     save(); back();
