@@ -274,3 +274,8 @@ html.dark .pz{background:#111}
 html.dark .acl button{background:#2c2c2e;color:#f2f2f7;border-top-color:#3a3a3c}
 html.dark .acx{background:#636366}
 html.kb #tabs{display:none}
+
+.adm{margin-top:3px;font-size:13px;line-height:1.35}.adm span{color:#6f737a}
+.admbox{border-left:4px solid #8b5cf6;padding-left:8px;margin-bottom:10px}
+.admd{margin-bottom:8px}.admd summary{font-weight:600;padding:8px 2px;color:#8b5cf6}
+html.dark .adm span{color:#98989d}

@@ -144,7 +144,7 @@ function searchHits(q) {
   q = q.trim().toLowerCase(); if (q.length < 2) return null;
   const hits = [];
   for (const r of S.reports) for (const e of r.events) {
-    const hay = [r.name, e.category, e.text, e.comment, e.address, e.phone].filter(Boolean).join(' ').toLowerCase();
+    const hay = [r.name, e.category, e.text, e.comment, e.address, e.phone, e.adm, e.dom].filter(Boolean).join(' ').toLowerCase();
     if (hay.includes(q)) hits.push({ r, e });
   }
   return hits.sort((a, b) => b.e.ts - a.e.ts);
@@ -205,7 +205,7 @@ function evHTML(e, pending, edit) {
   return `${sw ? `<div class="swipe"><button class="swbg" data-a="swipeDel" data-id="${e.id}">Supprimer</button>` : ''}<div class="ev ${pending ? 'pending' : ''}" ${colorOf(e) ? `style="border-left:5px solid ${colorOf(e)}"` : ''} ${pending ? '' : `data-a="openEvent" data-id="${e.id}"`}>
     ${edit ? `<button class="del" data-a="quickDelEvent" data-id="${e.id}">Suppr.</button>` : ''}<div class="time">${fTime(e.ts)}</div>
     <div class="body">${bits.join(' — ') || (e.type === 'audio' ? '<span class="cat">Mémo vocal</span>' : e.type === 'photo' ? '<span class="cat">Photo</span>' : e.type === 'video' ? '<span class="cat">Vidéo</span>' : '')}
-      ${e.phone ? `<div class="meta">📞 ${esc(e.phone)}</div>` : ''}${audio}${meta.length ? `<div class="meta">📍 ${meta.join(' · ')}</div>` : ''}
+      ${admLines(e).length ? `<div class="adm">${admLines(e).map(([k, v]) => `<div><span>${k} :</span> ${esc(v)}</div>`).join('')}</div>` : ''}${audio}${meta.length ? `<div class="meta">📍 ${meta.join(' · ')}</div>` : ''}
       ${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}</div>${media}</div>${sw ? '</div>' : ''}`;
 }
 
@@ -247,7 +247,7 @@ VIEWS.report = c => {
 };
 
 VIEWS.event = c => {
-  c.after = () => attachAddr($('#eAddr'));
+  c.after = () => { attachAddr($('#eAddr')); attachAddr($('#eDom')); };
   const r = S.reports.find(x => x.id === c.rid); const e = r && r.events.find(x => x.id === c.id);
   if (!e) { stacks[tab].pop(); return VIEWS[cur().v](cur()); }
   setBar('Évènement', backBtn(), `<button class="bbtn" data-a="saveEvent">OK</button>`);
@@ -260,8 +260,13 @@ VIEWS.event = c => {
       <div class="cpick"><button type="button" class="chip none ${!e.category ? 'on' : ''}" data-a="pickCat" data-v="">Aucune</button></div>
       ${S.categories.filter(k => k.actions.length).map(k => `<div class="cgrp">${esc(k.name)}</div><div class="cpick">${k.actions.map(a => `<button type="button" class="chip ${a === e.category ? 'on' : ''}" data-a="pickCat" data-v="${esc(a)}">${esc(a)}</button>`).join('')}</div>`).join('')}
       ${e.category && !cats.includes(e.category) ? `<div class="cpick"><button type="button" class="chip on" data-a="pickCat" data-v="${esc(e.category)}">${esc(e.category)}</button></div>` : ''}</div>
-    ${e.type === 'photo' ? `<div class="field"><label>Numéro lu sur la photo</label><input id="ePhone" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.phone === undefined ? 'Analyse en cours…' : 'Aucun numéro détecté'}"></div><button class="bigbtn grey" data-a="rescanPhone">Relire le numéro sur la photo</button>` : ''}
     <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Texte <button class="mini" data-a="dictText">🎤 Dicter</button></label><textarea id="eText">${esc(e.text || '')}</textarea></div>
+    <div class="admbox">
+      <div class="field"><label>Administrée :</label><input id="eAdm" value="${esc(e.adm || '')}" placeholder="Nom et prénom" autocapitalize="words"></div>
+      <div class="field"><label>Domiciliation :</label><input id="eDom" value="${esc(e.dom || '')}" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Coordonnées téléphoniques : ${e.phone ? `<a class="mini" style="background:#34a853;text-decoration:none" href="tel:${esc(e.phone.split(/[,;/]/)[0].replace(/\s/g, ''))}">📞 Appeler</a>` : ''}</label><input id="ePhone" type="tel" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.type === 'photo' && e.phone === undefined ? 'Lecture de la photo…' : '06 12 34 56 78'}"></div>
+      ${e.type === 'photo' ? `<button class="bigbtn grey" data-a="rescanPhone" style="margin:0 0 10px">Relire le numéro sur la photo</button>` : ''}
+    </div>
     <div class="field"><label>Adresse</label><input id="eAddr" value="${esc(e.address || '')}" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     ${e.lat != null ? `<div class="field"><label>Coordonnées${e.geoTs ? ' (relevées le ' + fDate(e.geoTs) + ' à ' + fTime(e.geoTs) + ')' : ''}</label><div>${e.lat.toFixed(6)}, ${e.lon.toFixed(6)}</div>${e.address ? `<div style="font-size:14px;color:#555;margin-top:4px">${esc(e.address)}</div>` : ''}</div>` : ''}
     <button class="bigbtn grey" data-a="addGeoToEvent">${e.lat != null ? 'Mettre à jour la position' : 'Ajouter ma position'}</button>
@@ -706,6 +711,9 @@ function rowsFor(reports) {
   if (st.multiExport === 'date' && reports.length > 1) rows.sort((a, b) => a.e.ts - b.e.ts);
   return rows;
 }
+function admLines(e) {
+  const l = []; if (e.adm) l.push(['Administrée', e.adm]); if (e.dom) l.push(['Domiciliation', e.dom]); if (e.phone) l.push(['Coordonnées téléphoniques', e.phone]); return l;
+}
 function evLine(e) {
   const st = S.settings; const parts = [];
   if (e.category) parts.push(e.category); if (e.text) parts.push(e.text);
@@ -721,12 +729,12 @@ function headerText(reports) {
 }
 function buildCSV(reports) {
   const st = S.settings; const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const head = ['Compte-rendu', 'Section', 'Profil', 'Date', 'Heure', 'Catégorie', 'Texte', 'Numéro', 'Type'];
+  const head = ['Compte-rendu', 'Section', 'Profil', 'Date', 'Heure', 'Catégorie', 'Texte', 'Administrée', 'Domiciliation', 'Coordonnées téléphoniques', 'Type'];
   if (st.showCoords) head.push('Latitude', 'Longitude'); if (st.showCoordDate) head.push('Date coordonnées');
   if (st.showAddress) head.push('Adresse'); if (st.showComment) head.push('Commentaire');
   const lines = [head.map(q).join(';')];
   for (const { r, e } of rowsFor(reports)) {
-    const row = [r.name, sectionName(r.sectionId), r.profile, fDate(e.ts), fTime(e.ts), e.category, e.text, e.phone || '', e.type];
+    const row = [r.name, sectionName(r.sectionId), r.profile, fDate(e.ts), fTime(e.ts), e.category, e.text, e.adm || '', e.dom || '', e.phone || '', e.type];
     if (st.showCoords) row.push(e.lat ?? '', e.lon ?? ''); if (st.showCoordDate) row.push(e.geoTs ? fDate(e.geoTs) + ' ' + fTime(e.geoTs) : '');
     if (st.showAddress) row.push(e.address); if (st.showComment) row.push(e.comment);
     lines.push(row.map(q).join(';'));
@@ -744,7 +752,7 @@ async function buildHTML(reports, withImages) {
     if (e.address && st.showAddress) meta.push(esc(e.address));
     const tag = multi && st.multiExport === 'date' ? `<span class="tag">${esc(r.name)}</span>` : '';
     const main = `${e.category ? `<b class="cat">${esc(e.category)}</b>` : ''}${e.category && e.text ? ' — ' : ''}${esc(e.text || '')}${!e.category && !e.text ? esc(evLine(e)) : ''}`;
-    return `<tr><td class="dt"><div class="d">${fDate(e.ts)}</div><div class="h">${fTime(e.ts)}</div></td><td class="c">${tag}<div class="txt">${main}</div>${e.phone ? `<div class="tel">N° : <b>${esc(e.phone)}</b></div>` : ''}${meta.length ? `<div class="meta">${meta.join(' · ')}</div>` : ''}${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}${img}</td></tr>`;
+    return `<tr><td class="dt"><div class="d">${fDate(e.ts)}</div><div class="h">${fTime(e.ts)}</div></td><td class="c">${tag}<div class="txt">${main}</div>${admLines(e).map(([k, v]) => `<div class="tel">${k} : <b>${esc(v)}</b></div>`).join('')}${meta.length ? `<div class="meta">${meta.join(' · ')}</div>` : ''}${e.comment && st.showComment ? `<div class="com">${esc(e.comment)}</div>` : ''}${img}</td></tr>`;
   };
   const table = async rows => { let h = ''; for (const x of rows) h += await evRow(x); return h ? `<table class="list"><thead><tr><th class="dt">Date et heure</th><th>Évènement</th></tr></thead><tbody>${h}</tbody></table>` : '<p class="empty">Aucun évènement.</p>'; };
   const info = (label, val) => `<div class="i"><span>${label}</span><b>${val}</b></div>`;
@@ -885,7 +893,11 @@ const A = {
   async camera() { const k = await sheet('Appareil photo', [['p', 'Prendre une photo'], ['v', 'Filmer une vidéo']]); if (k) { const el = k === 'p' ? $('#filePhoto') : $('#fileVideo'); el.value = ''; el.click(); } },
   async geo() { const e = {}; if (await attachGeo(e)) newEvent(Object.assign({ type: 'geo' }, e)); },
   mic() { recordAudio(); },
-  async text() { const v = await textModal('Nouvel évènement', ''); const a = lastAddr; if ((v && v.trim()) || a) newEvent(Object.assign({ type: 'text', text: (v || '').trim() }, a ? { address: fullAddr(a) } : {})); },
+  async text() {
+    lastAdm = {}; const v = await textModal('Nouvel évènement', ''); if (v === null) return; const a = lastAddr;
+    const extra = {}; for (const k of ['adm', 'dom', 'phone']) if (lastAdm[k]) extra[k] = lastAdm[k];
+    if ((v && v.trim()) || a || Object.keys(extra).length) newEvent(Object.assign({ type: 'text', text: (v || '').trim() }, a ? { address: fullAddr(a) } : {}, extra));
+  },
   qTab(d) { qTab = d.id; render(); },
   async rueMenu(d) {
     const top = stacks.cr[stacks.cr.length - 1]; const rep0 = top.v === 'report' ? S.reports.find(r => r.id === top.id) : null;
@@ -976,6 +988,8 @@ const A = {
     const ts = +$('#eTs').value; if (ts) e.ts = ts;
     e.category = $('#eCat').value; e.text = $('#eText').value.trim(); 
     const ph = $('#ePhone'); if (ph) e.phone = ph.value.trim();
+    const adm = $('#eAdm'); if (adm) e.adm = adm.value.trim();
+    const dom = $('#eDom'); if (dom) e.dom = dom.value.trim() ? fullAddr(dom.value.trim()) : '';
     const ad = $('#eAddr'); if (ad) e.address = ad.value.trim() ? fullAddr(ad.value.trim()) : '';
     save(); back();
   },
@@ -1067,7 +1081,7 @@ function summaryText(reports) {
   let last = '';
   for (const { r, e } of rows) {
     const d = fDate(e.ts); if (d !== last) { L.push(`[${d}]`); last = d; }
-    L.push(`${fTime(e.ts)}  ${evLine(e)}${e.phone ? ' — n° ' + e.phone : ''}${e.address && st.showAddress ? ' — ' + e.address : ''}${e.comment && st.showComment ? ' (' + e.comment + ')' : ''}${reports.length > 1 ? '  [' + r.name + ']' : ''}`);
+    L.push(`${fTime(e.ts)}  ${evLine(e)}${admLines(e).map(([k, v]) => ' — ' + k + ' : ' + v).join('')}${e.address && st.showAddress ? ' — ' + e.address : ''}${e.comment && st.showComment ? ' (' + e.comment + ')' : ''}${reports.length > 1 ? '  [' + r.name + ']' : ''}`);
   }
   L.push('', `Édité le ${fDate(Date.now())} à ${fTime(Date.now())}`);
   return L.join('\n');
@@ -1083,7 +1097,7 @@ function showSummary(reports) {
 }
 
 /* ---------- Dictée vocale ---------- */
-let dictCb = null, lastAddr = '';
+let dictCb = null, lastAddr = '', lastAdm = {};
 window.__dict = t => { const cb = dictCb; dictCb = null; cb && cb(t); };
 function dictate() {
   return new Promise(ok => {
@@ -1097,12 +1111,17 @@ function textModal(title, value) {
   return new Promise(ok => {
     modal(`<h3>${esc(title)}</h3><div class="field"><textarea id="tmT" style="min-height:110px">${esc(value || '')}</textarea></div>
       <div class="field"><label>Adresse (facultatif)</label><input id="tmA" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <details class="admd"><summary>👤 Administrée (facultatif)</summary>
+        <div class="field"><label>Administrée :</label><input id="tmAdm" placeholder="Nom et prénom" autocapitalize="words"></div>
+        <div class="field"><label>Domiciliation :</label><input id="tmDom" placeholder="Ex. : 12 rené coty" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label>Coordonnées téléphoniques :</label><input id="tmTel" type="tel" inputmode="tel" placeholder="06 12 34 56 78"></div>
+      </details>
       <button class="bigbtn dict" id="tmD">🎤 Dicter</button>
       <div class="row2"><button class="bigbtn grey" id="tmX">Annuler</button><button class="bigbtn" id="tmOk">OK</button></div>`, true);
-    const ta = $('#tmT'); setTimeout(() => ta.focus(), 50); attachAddr($('#tmA'));
+    const ta = $('#tmT'); setTimeout(() => ta.focus(), 50); attachAddr($('#tmA')); attachAddr($('#tmDom'));
     $('#tmD').onclick = async () => { const t = await dictate(); if (t && $('#tmT')) { const el = $('#tmT'); el.value = (el.value.trim() ? el.value.trim() + ' ' : '') + t; } };
     $('#tmX').onclick = () => { closeModal(); ok(null); };
-    $('#tmOk').onclick = () => { const v = $('#tmT').value; lastAddr = $('#tmA').value.trim(); closeModal(); ok(v); };
+    $('#tmOk').onclick = () => { const v = $('#tmT').value; lastAddr = $('#tmA').value.trim(); lastAdm = { adm: $('#tmAdm').value.trim(), dom: $('#tmDom').value.trim() ? fullAddr($('#tmDom').value.trim()) : '', phone: $('#tmTel').value.trim() }; closeModal(); ok(v); };
   });
 }
 
