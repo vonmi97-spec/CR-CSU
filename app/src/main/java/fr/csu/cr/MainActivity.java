@@ -51,6 +51,12 @@ import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import org.json.JSONObject;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.os.Environment;
+import android.speech.RecognizerIntent;
+import java.io.OutputStream;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -60,6 +66,7 @@ import java.util.List;
 public class MainActivity extends Activity {
     private static final int REQ_FILE = 10;
     private static final int REQ_PERM = 11;
+    private static final int REQ_DICT = 12;
     private WebView web;
     private ValueCallback<Uri[]> fileCb;
     private Uri cameraUri;
@@ -184,6 +191,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_DICT) {
+            String txt = "";
+            if (res == RESULT_OK && data != null) {
+                ArrayList<String> r = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (r != null && !r.isEmpty()) txt = r.get(0);
+            }
+            web.evaluateJavascript("window.__dict && window.__dict(" + JSONObject.quote(txt) + ")", null);
+            return;
+        }
         if (req != REQ_FILE || fileCb == null) return;
         Uri[] out = null;
         if (res == RESULT_OK) {
@@ -246,6 +262,53 @@ public class MainActivity extends Activity {
                 i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 startActivity(Intent.createChooser(i, "Partager / enregistrer"));
             } catch (Exception e) { e.printStackTrace(); }
+        }
+
+        @JavascriptInterface
+        public void dictate() {
+            runOnUiThread(() -> {
+                Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR");
+                i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Parlez…");
+                try { startActivityForResult(i, REQ_DICT); }
+                catch (Exception e) { web.evaluateJavascript("window.__dict && window.__dict(null)", null); }
+            });
+        }
+
+        /** Écrit une sauvegarde dans Téléchargements/CR-CSU et garde les 7 plus récentes. */
+        @JavascriptInterface
+        public String saveDownload(String name, String b64) {
+            try {
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentResolver cr = getContentResolver();
+                    ContentValues v = new ContentValues();
+                    v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+                    v.put(MediaStore.MediaColumns.MIME_TYPE, "application/json");
+                    v.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/CR-CSU");
+                    Uri u = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                    if (u == null) return "";
+                    try (OutputStream o = cr.openOutputStream(u)) { o.write(bytes); }
+                    // ne garder que les 7 dernières sauvegardes créées par l'appli
+                    try (Cursor c = cr.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                            new String[]{MediaStore.MediaColumns._ID},
+                            MediaStore.MediaColumns.RELATIVE_PATH + " LIKE ? AND " + MediaStore.MediaColumns.DISPLAY_NAME + " LIKE ?",
+                            new String[]{Environment.DIRECTORY_DOWNLOADS + "/CR-CSU%", "Sauvegarde_auto_%"},
+                            MediaStore.MediaColumns.DATE_ADDED + " DESC")) {
+                        int n = 0;
+                        while (c != null && c.moveToNext()) {
+                            if (++n > 7) cr.delete(Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, String.valueOf(c.getLong(0))), null, null);
+                        }
+                    } catch (Exception ignored) {}
+                    return "Téléchargements/CR-CSU/" + name;
+                } else {
+                    File dir = new File(getExternalFilesDir(null), "Sauvegardes");
+                    dir.mkdirs();
+                    try (FileOutputStream o = new FileOutputStream(new File(dir, name))) { o.write(bytes); }
+                    return dir.getAbsolutePath() + "/" + name;
+                }
+            } catch (Exception e) { return ""; }
         }
 
         @JavascriptInterface

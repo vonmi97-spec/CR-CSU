@@ -30,10 +30,10 @@ const DEFAULT = () => ({
   profile: { name: 'Zouti' },
   sections: [{ id: 'csu', name: 'CSU' }],
   categories: [
-    { id: 'c1', name: 'Surveillance', actions: ['Ronde caméras', 'Individu suspect', 'Attroupement'] },
-    { id: 'c2', name: 'Intervention', actions: ['Appel police', 'Appel pompiers', 'Réquisition vidéo'] },
-    { id: 'c3', name: 'Incident', actions: ['Accident', 'Dégradation', 'Rixe'] },
-    { id: 'c4', name: 'Technique', actions: ['Caméra HS', 'Panne réseau'] }
+    { id: 'c1', color: '#2f7cf6', name: 'Surveillance', actions: ['Ronde caméras', 'Individu suspect', 'Attroupement'] },
+    { id: 'c2', color: '#34a853', name: 'Intervention', actions: ['Appel police', 'Appel pompiers', 'Réquisition vidéo'] },
+    { id: 'c3', color: '#e5484d', name: 'Incident', actions: ['Accident', 'Dégradation', 'Rixe'] },
+    { id: 'c4', color: '#f59e0b', name: 'Technique', actions: ['Caméra HS', 'Panne réseau'] }
   ],
   buttons: ['c1|Ronde caméras', 'c1|Individu suspect', 'c2|Appel police', 'c2|Appel pompiers', 'c3|Accident', 'c3|Rixe'],
   reminders: [],
@@ -42,7 +42,8 @@ const DEFAULT = () => ({
     timeFormat: 'sans', maxButtons: '9', btnCols: '3', imageQuality: 'moyenne', videoQuality: 'moyenne', autoGeo: false, lang: 'fr',
     email: '', multiExport: 'date', showDates: 'debut', showCoords: true, showCoordDate: false,
     showAddress: true, showComment: true, protectedExport: false, pin: '',
-    lockOn: false, lockHash: '', lockSalt: '', lockLen: 0, lockBio: false, lockDelay: '60', secureScreen: false
+    lockOn: false, lockHash: '', lockSalt: '', lockLen: 0, lockBio: false, lockDelay: '60', secureScreen: false,
+    bigButtons: false, shiftAuto: false, shiftTimes: '07:00, 19:00', autoBackup: true, pdfOrg: '', pdfAgent: '', pdfLogo: '', pdfSign: '', pdfSummary: true
   },
   reports: []
 });
@@ -114,6 +115,14 @@ function render() {
 /* ---------- Vues ---------- */
 const VIEWS = {};
 const maxBtn = () => +(S.settings.maxButtons || 9);
+const PALETTE = ['#2f7cf6', '#34a853', '#e5484d', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b', '#a16207', '#0ea5e9'];
+const catColor = k => k.color || PALETTE[Math.max(0, S.categories.indexOf(k)) % PALETTE.length];
+function colorOf(e) {
+  let k = e.cat && S.categories.find(x => x.id === e.cat);
+  if (!k && e.category) k = S.categories.find(x => x.actions.includes(e.category));
+  return k ? catColor(k) : '';
+}
+function applyBig() { document.documentElement.classList.toggle('big', !!(S && S.settings.bigButtons)); }
 /* ---------- Thème clair / sombre ---------- */
 const mqDark = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
 function applyTheme() {
@@ -124,7 +133,27 @@ function applyTheme() {
 }
 if (mqDark && mqDark.addEventListener) mqDark.addEventListener('change', applyTheme);
 
-VIEWS.sections = () => {
+function searchHits(q) {
+  q = q.trim().toLowerCase(); if (q.length < 2) return null;
+  const hits = [];
+  for (const r of S.reports) for (const e of r.events) {
+    const hay = [r.name, e.category, e.text, e.comment, e.address, e.phone].filter(Boolean).join(' ').toLowerCase();
+    if (hay.includes(q)) hits.push({ r, e });
+  }
+  return hits.sort((a, b) => b.e.ts - a.e.ts);
+}
+function renderSearch() {
+  const box = $('#searchRes'); if (!box) return;
+  const q = $('#searchIn').value; const hits = searchHits(q);
+  $('#secList').style.display = hits ? 'none' : '';
+  if (!hits) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="hint">${plural(hits.length, 'résultat')}</div>` + hits.slice(0, 200).map(({ r, e }) => `<div class="cell" data-a="openHit" data-r="${r.id}" data-e="${e.id}" style="${colorOf(e) ? `border-left:5px solid ${colorOf(e)}` : ''}"><div class="grow"><div class="t" style="font-weight:600;font-size:15px">${esc(evLine(e))}</div><div class="s">${esc(r.name)} · ${fDate(e.ts)} à ${fTime(e.ts)}${e.comment ? ' · ' + esc(e.comment) : ''}${e.address ? ' · ' + esc(e.address) : ''}${e.phone ? ' · 📞 ' + esc(e.phone) : ''}</div></div><span class="chev">›</span></div>`).join('');
+}
+VIEWS.sections = c => {
+  c.after = () => { const i = $('#searchIn'); if (i) { i.value = c.q || ''; i.oninput = () => { c.q = i.value; renderSearch(); }; renderSearch(); } };
+  return `<div class="search"><input id="searchIn" type="search" placeholder="🔍 Rechercher (mot, adresse, plaque, n°…)" autocomplete="off"></div><div id="searchRes"></div><div id="secList">` + VIEWS._sections() + '</div>';
+};
+VIEWS._sections = () => {
   setBar('Sections', '', '');
   return `<div class="cell" data-a="openSection" data-id="*"><div class="grow t" style="font-weight:600">Toutes les sections</div><span class="val">${S.reports.length}</span><span class="chev">›</span></div>` +
     S.sections.map(s => `<div class="cell" data-a="openSection" data-id="${s.id}"><div class="grow">${esc(s.name)}</div><span class="val">${S.reports.filter(r => r.sectionId === s.id).length}</span><span class="chev">›</span></div>`).join('');
@@ -150,6 +179,7 @@ VIEWS.reports = c => {
 };
 
 let draft = null; // évènement en attente de validation
+let qTab = 'fav';
 function evHTML(e, pending, edit) {
   const st = S.settings; const bits = [];
   if (e.category) bits.push(`<span class="cat">${esc(e.category)}</span>`);
@@ -165,7 +195,7 @@ function evHTML(e, pending, edit) {
   if (e.lat != null && st.showCoords) meta.push(`${e.lat.toFixed(5)}, ${e.lon.toFixed(5)}`);
   if (e.address && st.showAddress) meta.push(esc(e.address));
   const sw = !pending && !edit;
-  return `${sw ? `<div class="swipe"><button class="swbg" data-a="swipeDel" data-id="${e.id}">Supprimer</button>` : ''}<div class="ev ${pending ? 'pending' : ''}" ${pending ? '' : `data-a="openEvent" data-id="${e.id}"`}>
+  return `${sw ? `<div class="swipe"><button class="swbg" data-a="swipeDel" data-id="${e.id}">Supprimer</button>` : ''}<div class="ev ${pending ? 'pending' : ''}" ${colorOf(e) ? `style="border-left:5px solid ${colorOf(e)}"` : ''} ${pending ? '' : `data-a="openEvent" data-id="${e.id}"`}>
     ${edit ? `<button class="del" data-a="quickDelEvent" data-id="${e.id}">Suppr.</button>` : ''}<div class="time">${fTime(e.ts)}</div>
     <div class="body">${bits.join(' — ') || (e.type === 'audio' ? '<span class="cat">Mémo vocal</span>' : e.type === 'photo' ? '<span class="cat">Photo</span>' : e.type === 'video' ? '<span class="cat">Vidéo</span>' : '')}
       ${e.phone ? `<div class="meta">📞 ${esc(e.phone)}</div>` : ''}${audio}${meta.length ? `<div class="meta">📍 ${meta.join(' · ')}</div>` : ''}
@@ -179,8 +209,15 @@ VIEWS.report = c => {
   setBar(r.name, backBtn(), edit ? `<button class="bbtn" data-a="toggleEdit">OK</button>` : `<button class="bbtn" data-a="shareReport">${ICON.share}</button><button class="bbtn" data-a="toggleEdit">Modifier</button>`);
   const evs = sortedEvents(r); let last = '';
   const list = evs.map(e => { const k = dayKey(e.ts); const h = k !== last ? `<div class="group" style="padding:8px 14px 4px;font-size:13px">${k}</div>` : ''; last = k; return h + evHTML(e, false, edit); }).join('');
-  const btns = S.buttons.slice(0, maxBtn()).map(b => { const [, a] = b.split('|'); return `<button class="qbtn" data-a="quick" data-b="${esc(b)}">${esc(a)}</button>`; }).join('');
-  c.after = () => { const el = $('.events'); if (el && S.settings.sortEvents !== 'date_desc') el.scrollTop = el.scrollHeight; };
+  const qb = (b) => { const [cid, a] = b.split('|'); const k = S.categories.find(x => x.id === cid); return `<button class="qbtn" data-a="quick" data-b="${esc(b)}" ${k ? `style="border-bottom:3px solid ${catColor(k)}"` : ''}>${esc(a)}</button>`; };
+  const qk = S.categories.find(k => k.id === qTab);
+  const btns = (qk ? qk.actions.map(a => qk.id + '|' + a) : S.buttons.slice(0, maxBtn())).map(qb).join('');
+  const qtabs = S.categories.length ? `<div class="qtabs"><button class="${qk ? '' : 'on'}" data-a="qTab" data-id="fav">★ Favoris</button>${S.categories.map(k => `<button class="${qk === k ? 'on' : ''}" data-a="qTab" data-id="${k.id}" style="--c:${catColor(k)}">${esc(k.name)}</button>`).join('')}</div>` : '';
+  c.after = () => {
+    const el = $('.events'); if (!el) return;
+    if (c.hl) { const t = el.querySelector(`.ev[data-id="${c.hl}"]`); c.hl = null; if (t) { t.scrollIntoView({ block: 'center' }); t.classList.add('flash'); return; } }
+    if (S.settings.sortEvents !== 'date_desc') el.scrollTop = el.scrollHeight;
+  };
   if (edit) return `<div class="report"><div class="events" style="background:#fff">
       <div class="cell" data-a="editReport"><div class="grow"><div class="t" style="font-weight:600">Nom, section et profil</div><div class="s">${esc(r.name)} · ${esc(sectionName(r.sectionId))} · ${esc(r.profile)}</div></div><span class="chev">›</span></div>
       <div class="hint">Touchez « Suppr. » pour effacer une note. Touchez une note pour la corriger.</div>
@@ -190,7 +227,7 @@ VIEWS.report = c => {
     <div class="events">${list || '<div class="empty">Aucun évènement.<br>Utilisez les boutons ci-dessous.</div>'}</div>
     <div class="panel">
       ${draft ? `<div class="draft">${evHTML(draft, true)}<textarea id="draftCom" placeholder="Commentaire (facultatif)">${esc(draft.comment || '')}</textarea></div>` : ''}
-      <div class="qbtns c${S.settings.btnCols || 3}">${btns || '<button class="qbtn none" data-a="gotoButtons">Configurer les boutons (Paramètres › Boutons)</button>'}</div>
+      ${qtabs}<div class="qbtns c${S.settings.btnCols || 3}">${btns || '<button class="qbtn none" data-a="gotoButtons">Configurer les boutons (Paramètres › Boutons)</button>'}</div>
       <div class="tools">
         <button class="tool" data-a="gallery">${ICON.gallery}</button>
         <button class="tool" data-a="camera">${ICON.camera}</button>
@@ -216,7 +253,7 @@ VIEWS.event = c => {
       ${S.categories.filter(k => k.actions.length).map(k => `<div class="cgrp">${esc(k.name)}</div><div class="cpick">${k.actions.map(a => `<button type="button" class="chip ${a === e.category ? 'on' : ''}" data-a="pickCat" data-v="${esc(a)}">${esc(a)}</button>`).join('')}</div>`).join('')}
       ${e.category && !cats.includes(e.category) ? `<div class="cpick"><button type="button" class="chip on" data-a="pickCat" data-v="${esc(e.category)}">${esc(e.category)}</button></div>` : ''}</div>
     ${e.type === 'photo' ? `<div class="field"><label>Numéro lu sur la photo</label><input id="ePhone" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.phone === undefined ? 'Analyse en cours…' : 'Aucun numéro détecté'}"></div><button class="bigbtn grey" data-a="rescanPhone">Relire le numéro sur la photo</button>` : ''}
-    <div class="field"><label>Texte</label><textarea id="eText">${esc(e.text || '')}</textarea></div>
+    <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Texte <button class="mini" data-a="dictText">🎤 Dicter</button></label><textarea id="eText">${esc(e.text || '')}</textarea></div>
     <div class="field"><label>Commentaire</label><textarea id="eCom">${esc(e.comment || '')}</textarea></div>
     ${e.lat != null ? `<div class="field"><label>Coordonnées${e.geoTs ? ' (relevées le ' + fDate(e.geoTs) + ' à ' + fTime(e.geoTs) + ')' : ''}</label><div>${e.lat.toFixed(6)}, ${e.lon.toFixed(6)}</div>${e.address ? `<div style="font-size:14px;color:#555;margin-top:4px">${esc(e.address)}</div>` : ''}</div>` : ''}
     <button class="bigbtn grey" data-a="addGeoToEvent">${e.lat != null ? 'Mettre à jour la position' : 'Ajouter ma position'}</button>
@@ -304,12 +341,16 @@ VIEWS.settings = () => {
   const th = st.theme || 'clair';
   return `<div class="group">Apparence</div>
     <div class="seg">${[['clair', '☀️ Clair'], ['sombre', '🌙 Sombre'], ['auto', '🌓 Auto']].map(([v, l]) => `<button class="${th === v ? 'on' : ''}" data-a="setTheme" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="cell" data-a="bool" data-k="bigButtons"><div class="grow"><div>Gros boutons</div><div class="s">Boutons plus grands pour noter en mouvement</div></div><span class="sw ${st.bigButtons ? 'on' : ''}"></span></div>
     <div class="group">Personnalisation</div>
     ${navCell('Profil', '', 'editProfile', esc(S.profile.name))}
     ${navCell('Sections', 'Rangez vos comptes-rendus dans des sections logiques', 'gotoSections')}
     ${navCell('Catégories', 'Créez vos catégories et leurs actions pour la prise de note', 'gotoCategories')}
     ${navCell(`Boutons (max ${maxBtn()})`, 'Personnalisez vos boutons à partir des catégories', 'gotoButtons')}
     ${navCell('Rappels', 'Définissez des rappels à une date précise ou après un délai', 'gotoReminders')}
+    <div class="group">Vacation</div>
+    <div class="cell" data-a="bool" data-k="shiftAuto"><div class="grow"><div>Compte-rendu automatique</div><div class="s">Créé et ouvert tout seul à chaque prise de service</div></div><span class="sw ${st.shiftAuto ? 'on' : ''}"></span></div>
+    ${st.shiftAuto ? `<div class="cell" data-a="shiftTimes"><div class="grow">Heures de prise de service</div><span class="val">${esc(st.shiftTimes)}</span></div>` : ''}
     <div class="group">Paramètres</div>
     <div class="cell" data-a="defaultName"><div class="grow">Nom par défaut</div><span class="val">${esc(st.defaultName)}</span></div>
     ${choiceCell('validation')}${choiceCell('sortReports')}${choiceCell('sortEvents')}${boolCell('useEndDate')}
@@ -326,6 +367,13 @@ VIEWS.settings = () => {
     <div class="group">Sauvegarde</div>
     <div class="cell" data-a="backup"><span style="font-size:20px">☁️</span><div class="grow t" style="font-weight:600">Sauvegarder</div></div>
     <div class="cell" data-a="restore"><span style="font-size:20px">📥</span><div class="grow t" style="font-weight:600">Restaurer</div></div>
+    <div class="cell" data-a="bool" data-k="autoBackup"><div class="grow"><div>Sauvegarde automatique</div><div class="s">${NATIVE ? 'Chaque jour dans Téléchargements › CR-CSU (7 dernières gardées)' : 'Disponible dans l\'appli Android'}${S.lastAutoBackup ? ' — dernière : ' + esc(S.lastAutoBackup) : ''}</div></div><span class="sw ${st.autoBackup ? 'on' : ''}"></span></div>
+    <div class="group">Modèle PDF</div>
+    <div class="cell" data-a="pdfField" data-k="pdfOrg"><div class="grow">En-tête (service, ville)</div><span class="val">${esc(st.pdfOrg) || 'Aucun'}</span></div>
+    <div class="cell" data-a="pdfField" data-k="pdfAgent"><div class="grow">Nom de l'agent</div><span class="val">${esc(st.pdfAgent) || esc(S.profile.name)}</span></div>
+    <div class="cell" data-a="pdfLogo"><div class="grow">Logo</div>${st.pdfLogo ? `<img src="${st.pdfLogo}" style="height:30px;max-width:90px;object-fit:contain">` : '<span class="val">Aucun</span>'}</div>
+    <div class="cell" data-a="pdfSign"><div class="grow">Signature</div>${st.pdfSign ? `<img src="${st.pdfSign}" style="height:30px;max-width:110px;object-fit:contain;background:#fff;border-radius:4px">` : '<span class="val">Aucune</span>'}</div>
+    <div class="cell" data-a="bool" data-k="pdfSummary"><div class="grow">Synthèse par catégorie dans le PDF</div><span class="sw ${st.pdfSummary ? 'on' : ''}"></span></div>
     <div class="group">Options d'export</div>
     <div class="cell" data-a="email"><div class="grow">Email</div><span class="val">${esc(st.email) || 'Non défini'}</span></div>
     ${choiceCell('multiExport')}${choiceCell('showDates')}${boolCell('showCoords')}${boolCell('showCoordDate')}${boolCell('showAddress')}${boolCell('showComment')}
@@ -350,7 +398,8 @@ VIEWS.categories = () => {
 VIEWS.category = c => {
   const k = S.categories.find(x => x.id === c.id); if (!k) { stacks[tab].pop(); return VIEWS[cur().v](cur()); }
   setBar(k.name, backBtn(), `<button class="bbtn plus" data-a="addAction">+</button>`);
-  return `<div class="cell" data-a="renameCategory"><div class="grow">Nom</div><span class="val">${esc(k.name)}</span></div><div class="group">Actions</div>` +
+  return `<div class="cell" data-a="renameCategory"><div class="grow">Nom</div><span class="val">${esc(k.name)}</span></div>
+    <div class="group">Couleur</div><div class="colors">${PALETTE.map(col => `<button data-a="setCatColor" data-c="${col}" style="background:${col}" class="${catColor(k) === col ? 'on' : ''}"></button>`).join('')}</div><div class="group">Actions</div>` +
     k.actions.map((a, i) => `<div class="cell"><div class="grow" data-a="renameAction" data-i="${i}">${esc(a)}</div><button class="del" data-a="delAction" data-i="${i}">Suppr.</button></div>`).join('') +
     `<div style="padding:16px"><button class="bigbtn red" data-a="delCategory">Supprimer la catégorie</button></div>`;
 };
@@ -367,7 +416,7 @@ VIEWS.reminders = () => {
 };
 VIEWS.about = () => {
   setBar('À propos');
-  return `<div class="about"><div class="logo">CR</div><h2 style="margin:0">CR CSU</h2><div style="color:#777">Version 1.0</div>
+  return `<div class="about"><div class="logo">CR</div><h2 style="margin:0">CR CSU</h2><div style="color:#777">Version 1.2</div>
   <p>Prise de notes horodatées pour rédiger les comptes-rendus du CSU : évènements, photos, vidéos, mémos vocaux, positions GPS.</p>
   <p style="font-size:14px;color:#666">Toutes les données restent sur ce téléphone. Pensez à utiliser <b>Paramètres › Sauvegarder</b> régulièrement.</p>
   <p style="font-size:13px;color:#888">${S.reports.length} compte(s)-rendu(s) · ${S.reports.reduce((n, r) => n + r.events.length, 0)} évènement(s)</p></div>`;
@@ -586,18 +635,29 @@ async function buildHTML(reports, withImages) {
   const table = async rows => { let h = ''; for (const x of rows) h += await evRow(x); return h ? `<table class="list"><thead><tr><th class="dt">Date et heure</th><th>Évènement</th></tr></thead><tbody>${h}</tbody></table>` : '<p class="empty">Aucun évènement.</p>'; };
   const info = (label, val) => `<div class="i"><span>${label}</span><b>${val}</b></div>`;
   const per = () => { const h = headerText(reports); if (!h) return ''; return h.startsWith('Début : ') ? info('Début', esc(h.slice(8))) : info('Période', esc(h)); };
+  const logo = st.pdfLogo ? `<img class="lg" src="${st.pdfLogo}">` : '';
+  const org = st.pdfOrg ? `<div class="org">${esc(st.pdfOrg)}</div>` : '';
+  const hd = t => `<header class="hd">${logo}<div>${org}<h1>${t}</h1></div></header>`;
+  const synth = () => { if (!st.pdfSummary) return ''; const c = countBy(reports); if (!c.length) return ''; return `<div class="syn"><b>Synthèse</b>${c.map(([n, v, col]) => `<span style="border-left:4px solid ${col || '#999'}">${esc(n)} : <b>${v}</b></span>`).join('')}</div>`; };
+  const sig = `<div class="sig"><div>L'agent : <b>${esc(st.pdfAgent || S.profile.name)}</b></div>${st.pdfSign ? `<img src="${st.pdfSign}">` : '<div class="sl"></div>'}</div>`;
   if (multi && st.multiExport === 'cr') {
-    body = `<header><h1>Comptes-rendus</h1><div class="sub">${esc(headerText(reports))}</div></header>`;
+    body = `<header class="hd">${logo}<div>${org}<h1>Comptes-rendus</h1><div class="sub">${esc(headerText(reports))}</div></div></header>${synth()}`;
     for (const r of reports) body += `<section><h2>${esc(r.name)}</h2><div class="info">${info('Section', esc(sectionName(r.sectionId)))}${info('Profil', esc(r.profile))}${info('Période', esc(reportSpan(r)))}${info('Évènements', r.events.length)}</div>${await table(rowsFor([r]))}</section>`;
   } else {
     const r0 = reports[0]; const n = rowsFor(reports).length;
-    body = `<header><h1>${multi ? 'Comptes-rendus' : esc(r0.name)}</h1></header><div class="info">${multi ? reports.map(r => info(esc(r.name), esc(reportSpan(r)))).join('') : info('Section', esc(sectionName(r0.sectionId))) + info('Profil', esc(r0.profile))}${per()}${info('Évènements', n)}</div>` + await table(rowsFor(reports));
+    body = `${hd(multi ? 'Comptes-rendus' : esc(r0.name))}<div class="info">${multi ? reports.map(r => info(esc(r.name), esc(reportSpan(r)))).join('') : info('Section', esc(sectionName(r0.sectionId))) + info('Profil', esc(r0.profile))}${per()}${info('Évènements', n)}</div>${synth()}` + await table(rowsFor(reports));
   }
+  body += sig;
   const css = `@page{size:A4;margin:12mm 14mm 16mm}
 @media screen{html{background:#8a8f96}body{width:794px;margin:16px auto;background:#fff;padding:45px 53px;box-shadow:0 2px 12px #0006}.foot{position:static;margin-top:14px}.sp{height:0}}
 *{box-sizing:border-box}html,body{margin:0;padding:0}
 body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:10.5pt;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 header{border-bottom:3px solid #2b3a8c;padding-bottom:6px;margin-bottom:10px}
+.hd{display:flex;align-items:center;gap:14px}.hd .lg{max-height:56px;max-width:140px;object-fit:contain}
+.org{font-size:9pt;color:#555;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+.syn{margin:8px 0 12px;padding:8px 10px;background:#f4f6fc;border:1px solid #dde2f3;border-radius:6px;font-size:9.5pt;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.syn span{padding-left:6px}
+.sig{margin-top:26px;page-break-inside:avoid;text-align:right;font-size:10.5pt}.sig img{max-height:70px;max-width:220px;margin-top:6px}.sig .sl{margin:34px 0 0 auto;width:200px;border-bottom:1px solid #999}
 h1{font-size:20pt;margin:0;color:#2b3a8c;letter-spacing:.5px}
 h2{font-size:14pt;margin:18px 0 8px;color:#2b3a8c;border-bottom:1px solid #c9cfee;padding-bottom:3px}
 section{break-before:auto}section+section{break-before:page}
@@ -637,7 +697,8 @@ async function checkPin() {
 }
 async function exportReports(reports) {
   if (!reports.length) return;
-  const fmt = await sheet('Exporter', [['pdf', 'PDF'], ['csv', 'CSV (Excel)'], ['doc', 'DOC (Word)'], ['mail', 'Email (texte)']]);
+  const fmt = await sheet('Exporter', [['resume', '📋 Résumé de fin de service'], ['pdf', 'PDF'], ['csv', 'CSV (Excel)'], ['doc', 'DOC (Word)'], ['mail', 'Email (texte)']]);
+  if (fmt === 'resume') return showSummary(reports);
   if (!fmt || !(await checkPin())) return;
   const todo = reports.flatMap(r => r.events).filter(e => e.type === 'photo' && e.mediaId && e.phone === undefined);
   if (todo.length && NATIVE && Android.ocr) { toast('Lecture des numéros sur les photos…'); for (const e of todo) await detectPhone(e); save(); }
@@ -650,10 +711,21 @@ async function exportReports(reports) {
 }
 
 /* ---------- Sauvegarde / restauration ---------- */
+async function backupJSON() {
+  const media = {}; for (const k of await allMediaKeys()) { const b = await getMedia(k); if (b) media[k] = await blobToDataURL(b); }
+  return JSON.stringify({ app: 'CR-CSU', v: 1, date: Date.now(), state: S, media });
+}
+async function autoBackup(force) {
+  if (!NATIVE || !Android.saveDownload || !S.settings.autoBackup) return;
+  const today = fDate(Date.now()); if (!force && S.lastAutoBackup === today) return;
+  try {
+    const p = Android.saveDownload(`Sauvegarde_auto_${today.split('/').reverse().join('-')}.json`, b64(await backupJSON()));
+    if (p) { S.lastAutoBackup = today; save(); if (force) toast('Sauvegarde enregistrée dans ' + p); }
+  } catch {}
+}
 async function backup() {
   toast('Préparation de la sauvegarde…');
-  const media = {}; for (const k of await allMediaKeys()) { const b = await getMedia(k); if (b) media[k] = await blobToDataURL(b); }
-  const json = JSON.stringify({ app: 'CR-CSU', v: 1, date: Date.now(), state: S, media });
+  const json = await backupJSON();
   shareFile(`Sauvegarde_CR_CSU_${fDate(Date.now()).replace(/\//g, '-')}.json`, 'application/json', b64(json), 'Sauvegarde CR CSU');
 }
 async function restore(file) {
@@ -699,7 +771,19 @@ const A = {
   async camera() { const k = await sheet('Appareil photo', [['p', 'Prendre une photo'], ['v', 'Filmer une vidéo']]); if (k) { const el = k === 'p' ? $('#filePhoto') : $('#fileVideo'); el.value = ''; el.click(); } },
   async geo() { const e = {}; if (await attachGeo(e)) newEvent(Object.assign({ type: 'geo' }, e)); },
   mic() { recordAudio(); },
-  async text() { const v = await ask('Nouvel évènement', [{ label: 'Texte', type: 'textarea' }]); if (v && v[0].trim()) newEvent({ type: 'text', text: v[0].trim() }); },
+  async text() { const v = await textModal('Nouvel évènement', ''); if (v && v.trim()) newEvent({ type: 'text', text: v.trim() }); },
+  qTab(d) { qTab = d.id; render(); },
+  async dictText() { const t = await dictate(); const el = $('#eText'); if (t && el) el.value = (el.value.trim() ? el.value.trim() + ' ' : '') + t; },
+  openHit(d) { draft = null; go('report', { id: d.r, hl: d.e }); },
+  setCatColor(d) { const k = S.categories.find(x => x.id === cur().id); k.color = d.c; save(); render(); },
+  async shiftTimes() { const v = await ask('Heures de prise de service', [{ label: 'Une ou plusieurs heures, séparées par des virgules (ex. 07:00, 19:00)', value: S.settings.shiftTimes }]); if (!v) return; const t = parseShiftTimes(v[0]); if (!t.length) return toast('Format attendu : 07:00, 19:00'); S.settings.shiftTimes = t.join(', '); S.lastShift = 0; save(); render(); checkShift(); },
+  async pdfField(d) { const lab = d.k === 'pdfOrg' ? 'En-tête du PDF (ex. Police municipale de … — CSU)' : 'Nom de l\'agent'; const v = await ask(lab, [{ label: lab, value: S.settings[d.k] }]); if (v) { S.settings[d.k] = v[0].trim(); save(); render(); } },
+  async pdfLogo() {
+    if (S.settings.pdfLogo) { const k = await sheet('Logo', [['new', 'Choisir un autre logo'], ['del', 'Retirer le logo']]); if (!k) return; if (k === 'del') { S.settings.pdfLogo = ''; save(); render(); return; } }
+    pickImage(async f => { S.settings.pdfLogo = await imageToDataURL(f, 400); save(); render(); });
+  },
+  async pdfSign() { const u = await signaturePad(); if (u !== null) { S.settings.pdfSign = u; save(); render(); } },
+  async summary() { const r = curReport(); showSummary([r]); },
   validate() { commitDraft(); },
   cancelDraft() { if (draft && draft.mediaId) delMedia(draft.mediaId); draft = null; render(); },
   swipeDel(d) {
@@ -775,7 +859,7 @@ const A = {
     const k = d.k;
     if (k === 'protectedExport' && !S.settings[k]) { const v = await ask('Code d\'export (4 chiffres ou plus)', [{ label: 'Code', type: 'password' }, { label: 'Confirmer', type: 'password' }]); if (!v) return; if (v[0].length < 4 || v[0] !== v[1]) return toast('Codes invalides ou différents'); S.settings.pin = v[0]; }
     if (k === 'protectedExport' && S.settings[k]) { if (!(await checkPin())) return; S.settings.pin = ''; }
-    S.settings[k] = !S.settings[k]; save(); render();
+    S.settings[k] = !S.settings[k]; save(); applyBig(); render(); if (k === 'shiftAuto' && S.settings.shiftAuto) { S.lastShift = 0; checkShift(); } if (k === 'autoBackup' && S.settings.autoBackup) autoBackup(true);
   },
   async email() { const v = await ask('Email de destination', [{ label: 'Adresse', type: 'email', value: S.settings.email }]); if (v) { S.settings.email = v[0].trim(); save(); render(); } },
   info(d) { modal(`<h3>Information</h3><p style="text-align:center">${esc(d.m)}</p><button class="bigbtn" onclick="closeModal()">OK</button>`, true); },
@@ -816,23 +900,158 @@ function undoToast(msg, undo, commit) {
   setTimeout(end, 4500);
 }
 
+/* ---------- Synthèse / résumé de fin de service ---------- */
+function countBy(reports) {
+  const m = new Map();
+  for (const r of reports) for (const e of r.events) {
+    const n = e.category || { photo: 'Photos', video: 'Vidéos', audio: 'Mémos vocaux', geo: 'Positions', text: 'Notes texte' }[e.type] || 'Autres';
+    const x = m.get(n) || [n, 0, colorOf(e)]; x[1]++; m.set(n, x);
+  }
+  return [...m.values()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+function summaryText(reports) {
+  const st = S.settings; const rows = rowsFor(reports); const c = countBy(reports);
+  const ts = rows.map(x => x.e.ts);
+  const L = [];
+  L.push(`RÉSUMÉ DE FIN DE SERVICE${st.pdfOrg ? ' — ' + st.pdfOrg : ''}`);
+  L.push(reports.length > 1 ? `Comptes-rendus : ${reports.map(r => r.name).join(', ')}` : `Compte-rendu : ${reports[0].name} (section ${sectionName(reports[0].sectionId)})`);
+  L.push(`Agent : ${st.pdfAgent || S.profile.name}`);
+  if (ts.length) L.push(`Période : du ${fDate(Math.min(...ts))} ${fTime(Math.min(...ts))} au ${fDate(Math.max(...ts))} ${fTime(Math.max(...ts))}`);
+  L.push(`Total : ${plural(rows.length, 'évènement')}`, '', 'SYNTHÈSE');
+  for (const [n, v] of c) L.push(`- ${n} : ${v}`);
+  L.push('', 'CHRONOLOGIE');
+  let last = '';
+  for (const { r, e } of rows) {
+    const d = fDate(e.ts); if (d !== last) { L.push(`[${d}]`); last = d; }
+    L.push(`${fTime(e.ts)}  ${evLine(e)}${e.phone ? ' — n° ' + e.phone : ''}${e.address && st.showAddress ? ' — ' + e.address : ''}${e.comment && st.showComment ? ' (' + e.comment + ')' : ''}${reports.length > 1 ? '  [' + r.name + ']' : ''}`);
+  }
+  L.push('', `Édité le ${fDate(Date.now())} à ${fTime(Date.now())}`);
+  return L.join('\n');
+}
+function showSummary(reports) {
+  const txt = summaryText(reports); const c = countBy(reports);
+  modal(`<h3>📋 Résumé de fin de service</h3>
+    <div class="sumc">${c.map(([n, v, col]) => `<div style="border-left:5px solid ${col || '#999'}"><b>${v}</b><span>${esc(n)}</span></div>`).join('') || '<div class="hint">Aucun évènement.</div>'}</div>
+    <pre class="sumt">${esc(txt)}</pre>
+    <div class="row2"><button class="bigbtn grey" id="smX">Fermer</button><button class="bigbtn" id="smS">Partager</button></div>`, true);
+  $('#smX').onclick = closeModal;
+  $('#smS').onclick = () => { closeModal(); const subj = 'Résumé de fin de service — ' + (reports.length > 1 ? 'comptes-rendus' : reports[0].name); if (NATIVE) Android.sendEmail(S.settings.email || '', subj, txt); else location.href = `mailto:${S.settings.email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(txt)}`; };
+}
+
+/* ---------- Dictée vocale ---------- */
+let dictCb = null;
+window.__dict = t => { const cb = dictCb; dictCb = null; cb && cb(t); };
+function dictate() {
+  return new Promise(ok => {
+    if (NATIVE && Android.dictate) { dictCb = ok; Android.dictate(); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { toast('Dictée non disponible'); return ok(null); }
+    const r = new SR(); r.lang = 'fr-FR'; r.onresult = e => ok(e.results[0][0].transcript); r.onerror = () => ok(null); r.start(); toast('Parlez…');
+  });
+}
+function textModal(title, value) {
+  return new Promise(ok => {
+    modal(`<h3>${esc(title)}</h3><div class="field"><textarea id="tmT" style="min-height:110px">${esc(value || '')}</textarea></div>
+      <button class="bigbtn dict" id="tmD">🎤 Dicter</button>
+      <div class="row2"><button class="bigbtn grey" id="tmX">Annuler</button><button class="bigbtn" id="tmOk">OK</button></div>`, true);
+    const ta = $('#tmT'); setTimeout(() => ta.focus(), 50);
+    $('#tmD').onclick = async () => { const t = await dictate(); if (t && $('#tmT')) { const el = $('#tmT'); el.value = (el.value.trim() ? el.value.trim() + ' ' : '') + t; } };
+    $('#tmX').onclick = () => { closeModal(); ok(null); };
+    $('#tmOk').onclick = () => { const v = $('#tmT').value; closeModal(); ok(v); };
+  });
+}
+
+/* ---------- Vacation automatique ---------- */
+function parseShiftTimes(str) {
+  return String(str || '').split(/[,;\s]+/).map(x => x.trim().replace('h', ':')).filter(Boolean)
+    .map(x => { const m = x.match(/^(\d{1,2})(?::(\d{2}))?$/); if (!m || +m[1] > 23 || +(m[2] || 0) > 59) return null; return p2(+m[1]) + ':' + p2(+(m[2] || 0)); })
+    .filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).sort();
+}
+function lastShiftStart() {
+  const now = Date.now(); let best = 0;
+  for (const t of parseShiftTimes(S.settings.shiftTimes)) for (const dd of [0, -1]) {
+    const d = new Date(); d.setDate(d.getDate() + dd); const [h, m] = t.split(':'); d.setHours(+h, +m, 0, 0);
+    if (d.getTime() <= now && d.getTime() > best) best = d.getTime();
+  }
+  return best;
+}
+function checkShift() {
+  if (!S || !S.settings.shiftAuto) return;
+  const st = lastShiftStart(); if (!st || S.lastShift === st) return;
+  S.lastShift = st;
+  if (S.reports.some(r => r.shiftStart === st)) { save(); return; }
+  const r = { id: uid(), name: `${S.settings.defaultName || 'CR'} ${fDate(st)} ${fTime(st)}`, sectionId: S.sections[0].id, profile: S.profile.name, created: Date.now(), start: st, end: null, shiftStart: st, events: [] };
+  S.reports.push(r); save();
+  tab = 'cr'; stacks.cr = [{ v: 'sections' }, { v: 'reports', sec: r.sectionId }, { v: 'report', id: r.id }]; draft = null; render();
+  toast(`Vacation de ${fTime(st)} : compte-rendu créé`);
+}
+
+/* ---------- Images (logo) et signature ---------- */
+function pickImage(cb) {
+  const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*';
+  i.onchange = () => i.files[0] && cb(i.files[0]); i.click();
+}
+function imageToDataURL(file, max) {
+  return new Promise(ok => {
+    const img = new Image(); const u = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(u); ok(cv.toDataURL('image/png')); };
+    img.onerror = () => ok(''); img.src = u;
+  });
+}
+function signaturePad() {
+  return new Promise(ok => {
+    modal(`<h3>Signature</h3><div class="hint" style="text-align:center">Signez avec le doigt dans le cadre</div>
+      <canvas id="sgC" class="sigpad" width="600" height="260"></canvas>
+      <div class="row2"><button class="bigbtn grey" id="sgE">Effacer</button><button class="bigbtn red" id="sgD">Retirer</button></div>
+      <div class="row2"><button class="bigbtn grey" id="sgX">Annuler</button><button class="bigbtn" id="sgOk">Enregistrer</button></div>`, true);
+    const cv = $('#sgC'), g = cv.getContext('2d'); let drawing = false, empty = true;
+    g.lineWidth = 4; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#111';
+    const pos = e => { const b = cv.getBoundingClientRect(); return [(e.clientX - b.left) * cv.width / b.width, (e.clientY - b.top) * cv.height / b.height]; };
+    cv.onpointerdown = e => { drawing = true; empty = false; cv.setPointerCapture(e.pointerId); g.beginPath(); g.moveTo(...pos(e)); };
+    cv.onpointermove = e => { if (!drawing) return; g.lineTo(...pos(e)); g.stroke(); };
+    cv.onpointerup = cv.onpointercancel = () => { drawing = false; };
+    $('#sgE').onclick = () => { g.clearRect(0, 0, cv.width, cv.height); empty = true; };
+    $('#sgD').onclick = () => { closeModal(); ok(''); };
+    $('#sgX').onclick = () => { closeModal(); ok(null); };
+    $('#sgOk').onclick = () => { const u = empty ? '' : cv.toDataURL('image/png'); closeModal(); ok(u); };
+  });
+}
+
+/* ---------- Appui long : corriger l'heure ---------- */
+async function shiftEventTime(id) {
+  const r = curReport(); const e = r && r.events.find(x => x.id === id); if (!e) return;
+  if (navigator.vibrate) navigator.vibrate(30);
+  const k = await sheet(`Heure de « ${evLine(e)} » : ${fTime(e.ts)}`, [['-10', '− 10 min'], ['-5', '− 5 min'], ['-1', '− 1 min'], ['1', '+ 1 min'], ['5', '+ 5 min'], ['10', '+ 10 min'], ['set', 'Choisir l\'heure…']]);
+  if (!k) return;
+  if (k === 'set') {
+    const v = await ask('Nouvelle heure', [{ label: 'Heure', type: 'time', value: `${p2(new Date(e.ts).getHours())}:${p2(new Date(e.ts).getMinutes())}` }]);
+    if (!v || !v[0]) return; const [h, m] = v[0].split(':'); const d = new Date(e.ts); d.setHours(+h, +m, 0, 0); e.ts = d.getTime();
+  } else e.ts += +k * 60e3;
+  save(); render(); toast('Heure : ' + fTime(e.ts));
+}
+let lpT = null;
+
 /* ---------- Glisser pour supprimer ---------- */
 const SW = 96; let sw = null, swipedAt = 0;
 function closeSwipes(except) { document.querySelectorAll('.swipe .ev.open').forEach(el => { if (el !== except) { el.classList.remove('open'); el.style.transform = ''; } }); }
+document.addEventListener('contextmenu', e => { if (e.target.closest('.swipe .ev')) e.preventDefault(); });
 document.addEventListener('pointerdown', e => {
   const ev = e.target.closest('.swipe .ev'); if (!ev) { if (!e.target.closest('.swbg')) closeSwipes(); return; }
   sw = { el: ev, x: e.clientX, y: e.clientY, base: ev.classList.contains('open') ? -SW : 0, dx: 0, h: null };
+  clearTimeout(lpT); const id = ev.dataset.id;
+  lpT = setTimeout(() => { if (sw && sw.h === null && sw.el === ev) { sw = null; swipedAt = Date.now() + 400; shiftEventTime(id); } }, 550);
 });
 document.addEventListener('pointermove', e => {
   if (!sw) return;
   const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
-  if (sw.h === null) { if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; sw.h = Math.abs(dx) > Math.abs(dy); if (sw.h) closeSwipes(sw.el); }
+  if (sw.h === null) { if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; clearTimeout(lpT); sw.h = Math.abs(dx) > Math.abs(dy); if (sw.h) closeSwipes(sw.el); }
   if (!sw.h) return;
   sw.dx = dx; const w = sw.el.parentNode.offsetWidth;
   sw.el.style.transition = 'none';
   sw.el.style.transform = `translateX(${Math.max(-w, Math.min(0, sw.base + dx))}px)`;
 });
 function swipeEnd() {
+  clearTimeout(lpT);
   if (!sw) return; const s = sw; sw = null; if (!s.h) return;
   swipedAt = Date.now(); s.el.style.transition = '';
   const pos = s.base + s.dx, w = s.el.parentNode.offsetWidth;
@@ -899,6 +1118,7 @@ async function lockApp() {
 }
 window.__pause = () => { pausedAt = Date.now(); };
 window.__resume = skip => {
+  setTimeout(() => { checkShift(); autoBackup(); }, 500);
   if (skip || !pausedAt) return;
   if ((Date.now() - pausedAt) / 1000 >= +(S.settings.lockDelay || 0)) lockApp();
 };
@@ -927,4 +1147,4 @@ document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
 for (const id of ['fileGallery', 'filePhoto', 'fileVideo']) $('#' + id).onchange = e => handleFile(e.target.files[0]);
 $('#fileRestore').onchange = e => e.target.files[0] && restore(e.target.files[0]);
 
-(async () => { await load(); applyTheme(); applySecure(); lockApp(); render(); })();
+(async () => { await load(); applyTheme(); applyBig(); applySecure(); lockApp(); render(); checkShift(); setTimeout(() => autoBackup(), 4000); })();

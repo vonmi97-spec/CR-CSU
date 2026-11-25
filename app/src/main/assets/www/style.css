@@ -217,3 +217,34 @@ html.dark .dt-arr,html.dark .dt-pm{background:#2c2c2e;color:#5ea0ff}
 html.dark .field .dt-num{background:#2c2c2e;color:#f2f2f7}
 html.dark .field .dt-num:focus{background:#000;border-color:#2f7cf6}
 html.dark .dt-dlab span,html.dark .dt-col small{color:#98989f}
+
+/* --- améliorations --- */
+.qtabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;padding-bottom:2px;scrollbar-width:none}
+.qtabs::-webkit-scrollbar{display:none}
+.qtabs button{flex:0 0 auto;border:1px solid #b9bcc1;border-radius:16px;background:#fff;padding:6px 12px;font-size:13px;font-weight:600;color:#444;border-bottom:3px solid var(--c,#f5b400)}
+.qtabs button.on{background:var(--c,#f5b400);color:#fff;border-color:var(--c,#f5b400)}
+.search{padding:10px 12px;background:#eef0f3;position:sticky;top:0;z-index:2}
+.search input{width:100%;border:0;border-radius:10px;padding:11px 12px;font-size:16px;background:#fff;outline:none;color:#111}
+.colors{display:flex;flex-wrap:wrap;gap:10px;padding:12px 16px;background:#fff}
+.colors button{width:38px;height:38px;border-radius:50%;border:3px solid transparent}
+.colors button.on{border-color:#111;box-shadow:0 0 0 2px #fff inset}
+.sumc{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
+.sumc div{background:#fff;border-radius:8px;padding:8px 10px;display:flex;flex-direction:column}
+.sumc b{font-size:22px}.sumc span{font-size:13px;color:#555}
+.sumt{white-space:pre-wrap;background:#fff;border-radius:8px;padding:10px;font-size:12.5px;max-height:34vh;overflow:auto;font-family:inherit;margin:0 0 8px}
+.bigbtn.dict{background:#8b5cf6;margin:0 0 8px}
+.mini{border:0;background:#8b5cf6;color:#fff;border-radius:12px;padding:3px 10px;font-size:12px}
+.sigpad{width:100%;height:auto;background:#fff;border:2px dashed #bbb;border-radius:10px;touch-action:none;display:block}
+.ev.flash{animation:fl 1.6s ease}
+@keyframes fl{0%,40%{background:#fff3a8}100%{background:#fff}}
+html.big .qbtn{padding:17px 4px;font-size:16px}
+html.big .tool{height:66px}
+html.big .tool svg{width:32px;height:32px}
+html.big .ok,html.big .ko{height:60px;font-size:18px}
+html.big .qtabs button{padding:9px 16px;font-size:15px}
+html.dark .qtabs button{background:#1c1c1e;color:#ddd;border-color:#3a3a3c;border-bottom-color:var(--c,#f5b400)}
+html.dark .qtabs button.on{background:var(--c,#f5b400);color:#fff}
+html.dark .search{background:#000}html.dark .search input{background:#1c1c1e;color:#f2f2f7}
+html.dark .colors,html.dark .sumc div,html.dark .sumt{background:#1c1c1e;color:#f2f2f7}
+html.dark .sumc span{color:#aaa}
+html.dark .ev.flash{animation:none;background:#3a3410}
