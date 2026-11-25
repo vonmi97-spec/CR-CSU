@@ -256,10 +256,6 @@ VIEWS.event = c => {
   if (e.mediaId) media = e.type === 'photo' ? `<img data-media="${e.mediaId}">` : e.type === 'video' ? `<video controls data-media="${e.mediaId}"></video>` : `<audio controls data-media="${e.mediaId}"></audio>`;
   return `<div class="detail">${media}
     <div class="field dtp"><label>Date et heure</label><input type="hidden" id="eTs" value="${e.ts}">${dtPickerHTML(e.ts)}</div>
-    <div class="field"><label>Action / catégorie</label><input type="hidden" id="eCat" value="${esc(e.category || '')}">
-      <div class="cpick"><button type="button" class="chip none ${!e.category ? 'on' : ''}" data-a="pickCat" data-v="">Aucune</button></div>
-      ${S.categories.filter(k => k.actions.length).map(k => `<div class="cgrp">${esc(k.name)}</div><div class="cpick">${k.actions.map(a => `<button type="button" class="chip ${a === e.category ? 'on' : ''}" data-a="pickCat" data-v="${esc(a)}">${esc(a)}</button>`).join('')}</div>`).join('')}
-      ${e.category && !cats.includes(e.category) ? `<div class="cpick"><button type="button" class="chip on" data-a="pickCat" data-v="${esc(e.category)}">${esc(e.category)}</button></div>` : ''}</div>
     <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Texte <button class="mini" data-a="dictText">🎤 Dicter</button></label><textarea id="eText">${esc(e.text || '')}</textarea></div>
     <div class="admbox">
       <div class="field"><label>Administrée :</label><input id="eAdm" value="${esc(e.adm || '')}" placeholder="Nom et prénom" autocapitalize="words"></div>
@@ -1024,7 +1020,7 @@ const A = {
   saveEvent() {
     const c = cur(); const r = S.reports.find(x => x.id === c.rid); const e = r.events.find(x => x.id === c.id);
     const ts = +$('#eTs').value; if (ts) e.ts = ts;
-    e.category = $('#eCat').value; e.text = $('#eText').value.trim(); 
+    const ec = $('#eCat'); if (ec) e.category = ec.value; e.text = $('#eText').value.trim(); 
     const ph = $('#ePhone'); if (ph) e.phone = ph.value.trim();
     const adm = $('#eAdm'); if (adm) e.adm = adm.value.trim();
     const dom = $('#eDom'); if (dom) e.dom = dom.value.trim() ? fullAddr(dom.value.trim()) : '';
