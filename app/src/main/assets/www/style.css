@@ -260,3 +260,5 @@ html.dark .ev.flash{animation:none;background:#3a3410}
 a.call{color:#2f7cf6;font-weight:700;text-decoration:none;font-size:16px;white-space:nowrap;padding:6px 0 6px 8px}
 html.dark .pzb button{background:#2c2c2ee6;color:#fff}
 html.dark .pz{background:#111}
+
+.rues{max-height:46vh;overflow-y:auto}

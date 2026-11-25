@@ -262,6 +262,7 @@ VIEWS.event = c => {
     ${e.type === 'photo' ? `<div class="field"><label>Numéro lu sur la photo</label><input id="ePhone" inputmode="tel" value="${esc(e.phone || '')}" placeholder="${e.phone === undefined ? 'Analyse en cours…' : 'Aucun numéro détecté'}"></div><button class="bigbtn grey" data-a="rescanPhone">Relire le numéro sur la photo</button>` : ''}
     <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Texte <button class="mini" data-a="dictText">🎤 Dicter</button></label><textarea id="eText">${esc(e.text || '')}</textarea></div>
     <div class="field"><label>Commentaire</label><textarea id="eCom">${esc(e.comment || '')}</textarea></div>
+    <div class="field"><label>Adresse</label><input id="eAddr" list="dlRues" value="${esc(e.address || '')}" placeholder="Rue de Yerres…" autocomplete="off"></div>
     ${e.lat != null ? `<div class="field"><label>Coordonnées${e.geoTs ? ' (relevées le ' + fDate(e.geoTs) + ' à ' + fTime(e.geoTs) + ')' : ''}</label><div>${e.lat.toFixed(6)}, ${e.lon.toFixed(6)}</div>${e.address ? `<div style="font-size:14px;color:#555;margin-top:4px">${esc(e.address)}</div>` : ''}</div>` : ''}
     <button class="bigbtn grey" data-a="addGeoToEvent">${e.lat != null ? 'Mettre à jour la position' : 'Ajouter ma position'}</button>
     <button class="bigbtn red" data-a="delEvent">Supprimer l'évènement</button></div>`;
@@ -430,16 +431,34 @@ let planSrc = '';
 async function planURL() { const b = await getMedia('plan_custom'); return b ? URL.createObjectURL(b) : 'plan_yerres.jpg'; }
 VIEWS.plan = c => {
   setBar('Plan de Yerres', '', `<button class="bbtn" data-a="planMenu">•••</button>`);
-  c.after = async () => { planSrc = planSrc || await planURL(); const img = $('#pzImg'); if (img) { img.src = planSrc; initZoom($('#pz'), img); } };
+  c.after = async () => {
+    const ri = $('#rueIn'); if (ri) { ri.value = c.rq || ''; const go2 = () => { c.rq = ri.value; renderRues(ri.value); }; ri.oninput = go2; renderRues(ri.value); }
+    planSrc = planSrc || await planURL(); const img = $('#pzImg'); if (img) { img.src = planSrc; initZoom($('#pz'), img); } };
   return `<div class="pz" id="pz"><img id="pzImg" alt="Plan" draggable="false"><div class="pzb"><button data-a="pzIn">＋</button><button data-a="pzOut">－</button><button data-a="pzFit">⤢</button><button data-a="pzFull">⛶</button></div></div>
     <div class="hint">Pincez pour zoomer, glissez pour vous déplacer, double-tap pour agrandir.</div>
     <div class="cell" data-a="openMaps"><span style="font-size:20px">🗺️</span><div class="grow"><div class="t" style="font-weight:600">Ouvrir Yerres dans Maps</div><div class="s">Carte détaillée et itinéraires (internet)</div></div><span class="chev">›</span></div>
     <div class="group">Quartiers</div>
     ${QUARTIERS.map(([col, n]) => `<div class="cell"><span style="width:22px;height:22px;border-radius:5px;background:${col};border:1px solid #0002;flex:0 0 auto"></span><div class="grow">${esc(n)}</div></div>`).join('')}
+    <div class="group">Rues de Yerres (${RUES.length})</div>
+    <div class="search" style="position:static"><input id="rueIn" type="search" placeholder="🔍 Chercher une rue, allée, place…" autocomplete="off"></div>
+    <div id="ruesList" class="rues"></div>
     <div class="group" style="display:flex;justify-content:space-between;align-items:center">Numéros utiles <button class="mini" data-a="addPhone" style="background:#2f7cf6">＋ Ajouter</button></div>
     ${S.phones.map((x, i) => `<div class="cell" data-a="phoneMenu" data-i="${i}"><span style="font-size:18px">📞</span><div class="grow"><div style="font-weight:600">${esc(x.n)}</div>${x.ok ? '' : '<div class="s">Lu sur le plan — à vérifier</div>'}</div><a class="call" href="tel:${esc(x.t.replace(/\s/g, ''))}" data-noop="1">${esc(x.t)}</a></div>`).join('')}
     <div style="height:24px"></div>`;
 };
+
+/* rues */
+const RUES = (window.RUES_YERRES || []).slice().sort((a, b) => sortKey(a).localeCompare(sortKey(b), 'fr'));
+function norm(x) { return x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/['’-]/g, ' '); }
+function sortKey(x) { return norm(x).replace(/^(rue|allee|avenue|place|impasse|residence|chemin|square|sentier|parc|mail|centre commercial|rond point|zone industrielle|hameau|domaine|chateau|ferme)\s+(de la |de l |des |du |de |d |la |le |les )?/, ''); }
+function fullAddr(a) { return /yerres/i.test(a) ? a : a + ', 91330 Yerres'; }
+function renderRues(q) {
+  const box = $('#ruesList'); if (!box) return;
+  const n = norm(q.trim()); const words = n.split(/\s+/).filter(Boolean);
+  const l = words.length ? RUES.filter(r => { const x = norm(r); return words.every(w => x.includes(w)); }) : RUES;
+  box.innerHTML = (l.length ? '' : '<div class="hint">Aucune voie trouvée.</div>') + l.map(r => `<div class="cell" data-a="rueMenu" data-r="${esc(r)}"><span style="font-size:15px">🛣️</span><div class="grow">${esc(r)}</div><span class="chev">›</span></div>`).join('');
+}
+function fillStreets() { const d = $('#dlRues'); if (d && !d.children.length) d.innerHTML = RUES.map(r => `<option value="${esc(r)}">`).join(''); }
 
 /* zoom / déplacement du plan */
 let PZ = null;
@@ -830,8 +849,19 @@ const A = {
   async camera() { const k = await sheet('Appareil photo', [['p', 'Prendre une photo'], ['v', 'Filmer une vidéo']]); if (k) { const el = k === 'p' ? $('#filePhoto') : $('#fileVideo'); el.value = ''; el.click(); } },
   async geo() { const e = {}; if (await attachGeo(e)) newEvent(Object.assign({ type: 'geo' }, e)); },
   mic() { recordAudio(); },
-  async text() { const v = await textModal('Nouvel évènement', ''); if (v && v.trim()) newEvent({ type: 'text', text: v.trim() }); },
+  async text() { const v = await textModal('Nouvel évènement', ''); const a = lastAddr; if ((v && v.trim()) || a) newEvent(Object.assign({ type: 'text', text: (v || '').trim() }, a ? { address: fullAddr(a) } : {})); },
   qTab(d) { qTab = d.id; render(); },
+  async rueMenu(d) {
+    const top = stacks.cr[stacks.cr.length - 1]; const rep0 = top.v === 'report' ? S.reports.find(r => r.id === top.id) : null;
+    const opts = [['maps', '🗺️ Voir dans Maps']]; if (rep0) opts.push(['note', `📝 Nouvelle note dans « ${rep0.name} »`]); opts.push(['copy', '📋 Copier le nom']);
+    const k = await sheet(d.r, opts);
+    if (k === 'maps') location.href = 'geo:0,0?q=' + encodeURIComponent(d.r + ', 91330 Yerres');
+    if (k === 'copy') { try { await navigator.clipboard.writeText(d.r); toast('Copié'); } catch { toast(d.r); } }
+    if (k === 'note' && rep0) {
+      const v = await textModal('Note — ' + d.r, ''); if (v === null) return;
+      rep0.events.push({ id: uid(), ts: Date.now(), type: 'text', text: (v || '').trim(), address: fullAddr(lastAddr || d.r) }); save(); toast('Note ajoutée dans ' + rep0.name);
+    }
+  },
   pzIn() { if (PZ) PZ.zoomAt(1.6, PZ.box.clientWidth / 2, PZ.box.clientHeight / 2); },
   pzOut() { if (PZ) PZ.zoomAt(1 / 1.6, PZ.box.clientWidth / 2, PZ.box.clientHeight / 2); },
   pzFit() { if (PZ) PZ.fit(); },
@@ -910,6 +940,7 @@ const A = {
     const ts = +$('#eTs').value; if (ts) e.ts = ts;
     e.category = $('#eCat').value; e.text = $('#eText').value.trim(); e.comment = $('#eCom').value.trim();
     const ph = $('#ePhone'); if (ph) e.phone = ph.value.trim();
+    const ad = $('#eAddr'); if (ad) e.address = ad.value.trim() ? fullAddr(ad.value.trim()) : '';
     save(); back();
   },
   async rescanPhone() {
@@ -1016,7 +1047,7 @@ function showSummary(reports) {
 }
 
 /* ---------- Dictée vocale ---------- */
-let dictCb = null;
+let dictCb = null, lastAddr = '';
 window.__dict = t => { const cb = dictCb; dictCb = null; cb && cb(t); };
 function dictate() {
   return new Promise(ok => {
@@ -1029,12 +1060,13 @@ function dictate() {
 function textModal(title, value) {
   return new Promise(ok => {
     modal(`<h3>${esc(title)}</h3><div class="field"><textarea id="tmT" style="min-height:110px">${esc(value || '')}</textarea></div>
+      <div class="field"><label>Adresse (facultatif)</label><input id="tmA" list="dlRues" placeholder="Commencez à taper une rue de Yerres…" autocomplete="off"></div>
       <button class="bigbtn dict" id="tmD">🎤 Dicter</button>
       <div class="row2"><button class="bigbtn grey" id="tmX">Annuler</button><button class="bigbtn" id="tmOk">OK</button></div>`, true);
     const ta = $('#tmT'); setTimeout(() => ta.focus(), 50);
     $('#tmD').onclick = async () => { const t = await dictate(); if (t && $('#tmT')) { const el = $('#tmT'); el.value = (el.value.trim() ? el.value.trim() + ' ' : '') + t; } };
     $('#tmX').onclick = () => { closeModal(); ok(null); };
-    $('#tmOk').onclick = () => { const v = $('#tmT').value; closeModal(); ok(v); };
+    $('#tmOk').onclick = () => { const v = $('#tmT').value; lastAddr = $('#tmA').value.trim(); closeModal(); ok(v); };
   });
 }
 
@@ -1225,4 +1257,4 @@ document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
 for (const id of ['fileGallery', 'filePhoto', 'fileVideo']) $('#' + id).onchange = e => handleFile(e.target.files[0]);
 $('#fileRestore').onchange = e => e.target.files[0] && restore(e.target.files[0]);
 
-(async () => { await load(); applyTheme(); applyBig(); applySecure(); lockApp(); render(); checkShift(); setTimeout(() => autoBackup(), 4000); })();
+(async () => { await load(); fillStreets(); applyTheme(); applyBig(); applySecure(); lockApp(); render(); checkShift(); setTimeout(() => autoBackup(), 4000); })();
